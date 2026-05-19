@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0f">
+<title>TR Advisor – KI Anlageberater</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c26;
+    --border: rgba(255,255,255,0.07);
+    --accent: #c8ff00;
+    --accent-dim: rgba(200,255,0,0.12);
+    --red: #ff4d6a;
+    --red-dim: rgba(255,77,106,0.12);
+    --text: #f0f0f5;
+    --text-muted: #6b6b80;
+    --text-dim: #9999aa;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    max-width: 430px;
+    margin: 0 auto;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Header */
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10,10,15,0.92);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--accent); }
+
+  .notif-btn {
+    width: 36px; height: 36px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.2s;
+  }
+  .notif-btn:active { background: var(--surface); }
+  .notif-dot {
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    position: absolute;
+    top: 14px; right: 18px;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* Sections */
+  .section { padding: 20px 20px 0; }
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  /* Signal Banner */
+  .signal-banner {
+    background: var(--accent-dim);
+    border: 1px solid rgba(200,255,0,0.25);
+    border-radius: 16px;
+    padding: 16px;
+    margin: 20px 20px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .signal-banner:active { background: rgba(200,255,0,0.18); }
+  .signal-icon {
+    width: 40px; height: 40px;
+    background: var(--accent);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .signal-text { flex: 1; }
+  .signal-text h3 { font-size: 14px; font-weight: 700; color: var(--accent); }
+  .signal-text p { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .signal-arrow { color: var(--accent); font-size: 18px; }
+
+  /* Portfolio Cards */
+  .portfolio-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .asset-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .asset-card:active { background: var(--surface2); }
+  .asset-card.buy { border-left: 3px solid var(--accent); }
+  .asset-card.sell { border-left: 3px solid var(--red); }
+  .asset-card.hold { border-left: 3px solid var(--text-muted); }
+
+  .asset-logo {
+    width: 42px; height: 42px;
+    background: var(--surface2);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+    font-weight: 700;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .asset-info { flex: 1; min-width: 0; }
+  .asset-name { font-size: 14px; font-weight: 700; }
+  .asset-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; font-family: var(--mono); }
+
+  .asset-right { text-align: right; flex-shrink: 0; }
+  .asset-price { font-size: 15px; font-weight: 700; font-family: var(--mono); }
+  .asset-change { font-size: 11px; font-family: var(--mono); margin-top: 2px; }
+  .asset-change.pos { color: var(--accent); }
+  .asset-change.neg { color: var(--red); }
+
+  .signal-badge {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 3px 7px;
+    border-radius: 6px;
+    margin-top: 4px;
+    display: inline-block;
+  }
+  .signal-badge.buy { background: var(--accent-dim); color: var(--accent); }
+  .signal-badge.sell { background: var(--red-dim); color: var(--red); }
+  .signal-badge.hold { background: rgba(107,107,128,0.15); color: var(--text-muted); }
+
+  /* Add Asset Button */
+  .add-btn {
+    background: var(--surface);
+    border: 1px dashed rgba(255,255,255,0.15);
+    border-radius: 16px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    width: 100%;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .add-btn:active { background: var(--surface2); }
+
+  /* Bottom Nav */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 430px;
+    background: rgba(10,10,15,0.95);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border);
+    display: flex;
+    padding: 10px 0 24px;
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    padding: 6px 0;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    transition: color 0.2s;
+  }
+  .nav-item.active { color: var(--accent); }
+  .nav-item .icon { font-size: 20px; }
+
+  /* Modal Overlay */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    z-index: 200;
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; animation: fadeIn 0.2s; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px 24px 0 0;
+    padding: 20px 20px 40px;
+    width: 100%;
+    max-width: 430px;
+    animation: slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+  .modal-handle {
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+
+  .modal h2 { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
+  .modal p { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; line-height: 1.5; }
+
+  .input-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+
+  .input-field {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .input-field:focus { border-color: rgba(200,255,0,0.4); }
+  .input-field::placeholder { color: var(--text-muted); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0a0a0f;
+    border: none;
+    border-radius: 14px;
+    padding: 16px;
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 800;
+    width: 100%;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn-primary:active { opacity: 0.85; }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    width: 100%;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+
+  /* Analysis Modal */
+  .analysis-section { margin-bottom: 16px; }
+  .analysis-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; }
+  .analysis-text { font-size: 13px; line-height: 1.6; color: var(--text-dim); }
+  .analysis-verdict {
+    font-size: 24px; font-weight: 800;
+    margin: 4px 0 8px;
+  }
+  .analysis-verdict.buy { color: var(--accent); }
+  .analysis-verdict.sell { color: var(--red); }
+  .analysis-verdict.hold { color: var(--text-muted); }
+
+  .loading-dots span {
+    display: inline-block;
+    animation: blink 1.2s infinite;
+    font-size: 20px;
+    color: var(--accent);
+  }
+  .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }
+
+  .spacer { height: 100px; }
+
+  /* API Key Setup */
+  .setup-banner {
+    background: var(--surface2);
+    border: 1px solid rgba(200,255,0,0.2);
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin: 16px 20px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+  }
+  .setup-banner p { font-size: 12px; color: var(--text-dim); flex: 1; }
+  .setup-banner strong { color: var(--accent); display: block; font-size: 13px; margin-bottom: 2px; }
+
+  /* Notification toast */
+  .toast {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    z-index: 300;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">TR <span>Advisor</span></div>
+  <div style="position:relative;">
+    <div class="notif-btn" onclick="requestNotifications()">🔔</div>
+    <div class="notif-dot" id="notifDot" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- Setup Banner -->
+<div class="setup-banner" id="setupBanner" onclick="openSetupModal()">
+  <span style="font-size:20px;">🔑</span>
+  <div style="flex:1;">
+    <strong>API-Schlüssel einrichten</strong>
+    <p>Einmalig eintragen – dann läuft die KI-Analyse kostenlos.</p>
+  </div>
+  <span style="color:var(--accent);">›</span>
+</div>
+
+<!-- Signal Banner -->
+<div class="signal-banner" id="signalBanner" onclick="showSignalDetail()">
+  <div class="signal-icon">⚡</div>
+  <div class="signal-text">
+    <h3>1 aktives Signal</h3>
+    <p>MSCI World – Kaufgelegenheit erkannt</p>
+  </div>
+  <div class="signal-arrow">›</div>
+</div>
+
+<!-- Portfolio -->
+<div class="section" style="margin-top:20px;">
+  <div class="section-title">Mein Portfolio</div>
+  <div class="portfolio-list" id="portfolioList">
+    <!-- Cards werden per JS gerendert -->
+  </div>
+  <div style="margin-top:10px;">
+    <button class="add-btn" onclick="openAddModal()">
+      <span>＋</span> Asset hinzufügen
+    </button>
+  </div>
+</div>
+
+<div class="spacer"></div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+  <div class="nav-item active">
+    <div class="icon">📊</div>
+    Portfolio
+  </div>
+  <div class="nav-item">
+    <div class="icon">🔍</div>
+    Analyse
+  </div>
+  <div class="nav-item">
+    <div class="icon">🔔</div>
+    Signale
+  </div>
+  <div class="nav-item">
+    <div class="icon">⚙️</div>
+    Einst.
+  </div>
+</div>
+
+<!-- Setup Modal -->
+<div class="modal-overlay" id="setupModal" onclick="closeModalOnBg(event,'setupModal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>🔑 API-Schlüssel</h2>
+    <p>Trage deinen Gemini API-Schlüssel ein. Er wird nur auf deinem Gerät gespeichert und nie weitergegeben.</p>
+    <div class="input-group">
+      <input class="input-field" id="apiKeyInput" placeholder="AIza..." type="password" />
+    </div>
+    <button class="btn-primary" onclick="saveApiKey()">Speichern & loslegen</button>
+    <button class="btn-secondary" onclick="closeModal('setupModal')">Abbrechen</button>
+  </div>
+</div>
+
+<!-- Add Asset Modal -->
+<div class="modal-overlay" id="addModal" onclick="closeModalOnBg(event,'addModal')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>Asset hinzufügen</h2>
+    <p>Trage den Namen oder das Ticker-Symbol ein und wie viele Anteile du hast.</p>
+    <div class="input-group">
+      <input class="input-field" id="assetName" placeholder="z.B. Apple oder AAPL" />
+      <input class="input-field" id="assetShares" placeholder="Anzahl Anteile (z.B. 5)" type="number" />
+      <input class="input-field" id="assetBuyPrice" placeholder="Kaufpreis pro Anteil in €" type="number" />
+    </div>
+    <button class="btn-primary" onclick="addAsset()">Hinzufügen & analysieren</button>
+    <button class="btn-secondary" onclick="closeModal('addModal')">Abbrechen</button>
+  </div>
+</div>
+
+<!-- Analysis Modal -->
+<div class="modal-overlay" id="analysisModal" onclick="closeModalOnBg(event,'analysisModal')">
+  <div class="modal" id="analysisContent">
+    <div class="modal-handle"></div>
+    <div id="analysisInner">
+      <div style="text-align:center; padding: 30px 0;">
+        <div class="loading-dots"><span>●</span><span>●</span><span>●</span></div>
+        <p style="margin-top:12px; font-size:13px; color:var(--text-muted);">KI analysiert…</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API_KEY_STORAGE = 'tr_gemini_key';
+
+function getApiKey() {
+  return localStorage.getItem(API_KEY_STORAGE) || '';
+}
+
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (!key.startsWith('AIza')) {
+    showToast('Schlüssel scheint ungültig (muss mit AIza beginnen)');
+    return;
+  }
+  localStorage.setItem(API_KEY_STORAGE, key);
+  closeModal('setupModal');
+  document.getElementById('setupBanner').style.display = 'none';
+  showToast('✅ API-Schlüssel gespeichert!');
+}
+
+function openSetupModal() {
+  const existing = getApiKey();
+  if (existing) document.getElementById('apiKeyInput').value = existing;
+  document.getElementById('setupModal').classList.add('open');
+}
+
+// Schlüssel beim Start prüfen
+window.addEventListener('load', () => {
+  if (getApiKey()) {
+    document.getElementById('setupBanner').style.display = 'none';
+  }
+});
+
+
+const STORAGE_KEY = 'tr_advisor_portfolio';
+
+let portfolio = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+
+if (portfolio.length === 0) {
+  // Demo-Daten
+  portfolio = [
+    { id: 1, name: 'MSCI World ETF', ticker: 'MSCI', shares: 10, buyPrice: 85, currentPrice: 92.40, signal: 'buy' },
+    { id: 2, name: 'Apple Inc.', ticker: 'AAPL', shares: 5, buyPrice: 178, currentPrice: 189.30, signal: 'hold' },
+    { id: 3, name: 'Tesla', ticker: 'TSLA', shares: 3, buyPrice: 245, currentPrice: 218.60, signal: 'sell' },
+  ];
+  savePortfolio();
+}
+
+function savePortfolio() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(portfolio));
+}
+
+// ─── Render ───────────────────────────────────────────────
+function renderPortfolio() {
+  const list = document.getElementById('portfolioList');
+  list.innerHTML = portfolio.map(a => {
+    const change = ((a.currentPrice - a.buyPrice) / a.buyPrice * 100).toFixed(1);
+    const isPos = change >= 0;
+    const signalLabels = { buy: 'KAUFEN', sell: 'VERKAUFEN', hold: 'HALTEN' };
+    return `
+      <div class="asset-card ${a.signal}" onclick="analyzeAsset(${a.id})">
+        <div class="asset-logo">${a.ticker.slice(0,4)}</div>
+        <div class="asset-info">
+          <div class="asset-name">${a.name}</div>
+          <div class="asset-sub">${a.shares} Anteile · ∅ €${a.buyPrice}</div>
+          <div class="signal-badge ${a.signal}">${signalLabels[a.signal]}</div>
+        </div>
+        <div class="asset-right">
+          <div class="asset-price">€${a.currentPrice}</div>
+          <div class="asset-change ${isPos ? 'pos' : 'neg'}">${isPos ? '+' : ''}${change}%</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+renderPortfolio();
+
+// ─── Add Asset ───────────────────────────────────────────
+function openAddModal() {
+  document.getElementById('addModal').classList.add('open');
+}
+
+function addAsset() {
+  const name = document.getElementById('assetName').value.trim();
+  const shares = parseFloat(document.getElementById('assetShares').value);
+  const buyPrice = parseFloat(document.getElementById('assetBuyPrice').value);
+
+  if (!name || !shares || !buyPrice) {
+    showToast('Bitte alle Felder ausfüllen');
+    return;
+  }
+
+  const ticker = name.slice(0, 4).toUpperCase();
+  const newAsset = {
+    id: Date.now(),
+    name, ticker, shares, buyPrice,
+    currentPrice: buyPrice, // wird bei Analyse aktualisiert
+    signal: 'hold'
+  };
+
+  portfolio.push(newAsset);
+  savePortfolio();
+  closeModal('addModal');
+  renderPortfolio();
+
+  // Sofort analysieren
+  setTimeout(() => analyzeAsset(newAsset.id), 400);
+
+  // Felder leeren
+  document.getElementById('assetName').value = '';
+  document.getElementById('assetShares').value = '';
+  document.getElementById('assetBuyPrice').value = '';
+}
+
+// ─── KI Analyse ───────────────────────────────────────────
+async function analyzeAsset(id) {
+  const asset = portfolio.find(a => a.id === id);
+  if (!asset) return;
+
+  document.getElementById('analysisModal').classList.add('open');
+  document.getElementById('analysisInner').innerHTML = `
+    <div style="text-align:center; padding: 30px 0;">
+      <div class="loading-dots"><span>●</span><span>●</span><span>●</span></div>
+      <p style="margin-top:12px; font-size:13px; color:var(--text-muted);">KI analysiert ${asset.name}…</p>
+    </div>
+  `;
+
+  const change = ((asset.currentPrice - asset.buyPrice) / asset.buyPrice * 100).toFixed(1);
+
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    document.getElementById('analysisInner').innerHTML = `
+      <p style="color:var(--accent);text-align:center;padding:20px;">Bitte zuerst den API-Schlüssel einrichten.</p>
+      <button class="btn-primary" onclick="closeModal('analysisModal');openSetupModal()">Jetzt einrichten</button>
+    `;
+    return;
+  }
+
+  try {
+    const prompt = `Du bist ein präziser KI-Anlageberater für Privatanleger. 
+Antworte NUR als reines JSON ohne Markdown-Backticks:
+{"verdict":"buy","verdict_de":"KAUFEN","reason":"2-3 Sätze auf Deutsch","tip":"1 konkreter Tipp auf Deutsch","risk":"niedrig"}
+
+Analysiere:
+Name: ${asset.name}
+Kaufpreis: €${asset.buyPrice}
+Aktueller Preis: €${asset.currentPrice}
+Veränderung: ${change}%
+Anteile: ${asset.shares}
+Gesamtwert: €${(asset.currentPrice * asset.shares).toFixed(2)}
+
+verdict muss "buy", "sell" oder "hold" sein. verdict_de muss "KAUFEN", "VERKAUFEN" oder "HALTEN" sein. risk muss "niedrig", "mittel" oder "hoch" sein.`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 500 }
+        })
+      }
+    );
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    let result;
+    try { result = JSON.parse(text.replace(/```json|```/g, '').trim()); }
+    catch { result = { verdict: 'hold', verdict_de: 'HALTEN', reason: 'Keine eindeutige Empfehlung möglich.', tip: 'Portfolio beobachten.', risk: 'mittel' }; }
+
+    // Signal aktualisieren
+    asset.signal = result.verdict;
+    savePortfolio();
+    renderPortfolio();
+
+    const riskColors = { niedrig: '#c8ff00', mittel: '#ffaa00', hoch: '#ff4d6a' };
+    document.getElementById('analysisInner').innerHTML = `
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+        <div class="asset-logo" style="width:48px;height:48px;">${asset.ticker.slice(0,4)}</div>
+        <div>
+          <div style="font-size:12px;color:var(--text-muted);font-family:var(--mono);">KI-ANALYSE</div>
+          <div style="font-size:18px;font-weight:800;">${asset.name}</div>
+        </div>
+      </div>
+      <div class="analysis-section">
+        <div class="analysis-label">Empfehlung</div>
+        <div class="analysis-verdict ${result.verdict}">${result.verdict_de}</div>
+      </div>
+      <div class="analysis-section">
+        <div class="analysis-label">Begründung</div>
+        <div class="analysis-text">${result.reason}</div>
+      </div>
+      <div class="analysis-section">
+        <div class="analysis-label">Handlungstipp</div>
+        <div class="analysis-text" style="color:var(--text);">→ ${result.tip}</div>
+      </div>
+      <div class="analysis-section">
+        <div class="analysis-label">Risiko</div>
+        <div style="font-size:14px;font-weight:700;color:${riskColors[result.risk] || '#ffaa00'};">${result.risk.toUpperCase()}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:12px;padding:12px;margin-top:4px;margin-bottom:16px;">
+        <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">⚠️ HINWEIS</div>
+        <div style="font-size:11px;color:var(--text-muted);line-height:1.5;">Dies ist keine Finanzberatung. Alle Empfehlungen sind KI-generiert und dienen nur zur Orientierung.</div>
+      </div>
+      <button class="btn-primary" onclick="closeModal('analysisModal')">Verstanden</button>
+    `;
+
+    // Push-Benachrichtigung senden wenn KAUFEN oder VERKAUFEN
+    if (result.verdict !== 'hold') {
+      sendNotification(asset.name, result.verdict_de, result.tip);
+    }
+
+  } catch (err) {
+    document.getElementById('analysisInner').innerHTML = `
+      <p style="color:var(--red);text-align:center;padding:20px;">Fehler bei der Analyse. Bitte versuche es erneut.</p>
+      <button class="btn-secondary" onclick="closeModal('analysisModal')">Schließen</button>
+    `;
+  }
+}
+
+// ─── Signal Detail ─────────────────────────────────────────
+function showSignalDetail() {
+  const buyAsset = portfolio.find(a => a.signal === 'buy');
+  if (buyAsset) analyzeAsset(buyAsset.id);
+}
+
+// ─── Notifications ─────────────────────────────────────────
+async function requestNotifications() {
+  if (!('Notification' in window)) {
+    showToast('Benachrichtigungen nicht unterstützt');
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') {
+    document.getElementById('notifDot').style.display = 'block';
+    showToast('✅ Benachrichtigungen aktiviert!');
+  } else {
+    showToast('Benachrichtigungen blockiert');
+  }
+}
+
+function sendNotification(name, signal, tip) {
+  if (Notification.permission === 'granted') {
+    const emoji = signal === 'KAUFEN' ? '🟢' : '🔴';
+    new Notification(`${emoji} ${signal}: ${name}`, {
+      body: tip,
+      icon: '/favicon.ico',
+      badge: '/favicon.ico'
+    });
+  }
+}
+
+// ─── Modals & Toast ────────────────────────────────────────
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+function closeModalOnBg(e, id) {
+  if (e.target.id === id) closeModal(id);
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
