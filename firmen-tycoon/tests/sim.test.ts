@@ -136,12 +136,14 @@ describe('Spielstand-Migration', () => {
     expect(s.speed).toBe(2);
     expect(s.unlocked).toEqual(['akkuschrauber']);
     expect(s.shelves).toBe(2);
+    expect(s.reputation).toBe(50);
+    expect(s.jobs).toEqual([]);
   });
 
-  it('v2-Spielstand bleibt erhalten', () => {
+  it('aktueller Spielstand (v3) bleibt beim Laden unverändert', () => {
     const sim = newSim();
     sim.unlockArticle('led');
-    const copy = migrate(2, JSON.parse(JSON.stringify(sim.state)));
+    const copy = migrate(3, JSON.parse(JSON.stringify(sim.state)));
     expect(copy).toEqual(sim.state);
   });
 });

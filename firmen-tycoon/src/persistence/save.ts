@@ -3,7 +3,7 @@
 import { createInitialState, GAME_SPEEDS, type GameState } from '../sim/state';
 
 /** Bei jeder inkompatiblen Änderung an GameState erhöhen und migrate() ergänzen. */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 const STORAGE_KEY = 'firmen-tycoon.save';
 
 interface SaveFile {
@@ -66,6 +66,7 @@ export function migrate(version: number, state: unknown): GameState {
 
   // v1 → v2: Handel (Sortiment, Lager, Markt, Bestellungen) kommt hinzu – Startwerte übernehmen.
   const hasTrade = version >= 2;
+  const hasJobs = version >= 3;
   const market = { ...d.market };
   if (hasTrade && s.market && typeof s.market === 'object') {
     for (const id of Object.keys(market)) if (s.market[id]) market[id] = { ...market[id], ...s.market[id] };
@@ -83,5 +84,16 @@ export function migrate(version: number, state: unknown): GameState {
     nextOrderId: hasTrade ? num(s.nextOrderId, d.nextOrderId) : d.nextOrderId,
     shelves: hasTrade ? num(s.shelves, d.shelves) : d.shelves,
     extension: hasTrade ? num(s.extension, d.extension) : d.extension,
+    // v2 → v3: Aufträge, Ruf, Firmenwagen, Meldungen
+    reputation: hasJobs ? num(s.reputation, d.reputation) : d.reputation,
+    offers: hasJobs && Array.isArray(s.offers) ? s.offers : d.offers,
+    jobs: hasJobs && Array.isArray(s.jobs) ? s.jobs : d.jobs,
+    completedJobs: hasJobs && Array.isArray(s.completedJobs) ? s.completedJobs : d.completedJobs,
+    nextJobId: hasJobs ? num(s.nextJobId, d.nextJobId) : d.nextJobId,
+    van: hasJobs && s.van && typeof s.van === 'object' ? { ...d.van, ...s.van } : d.van,
+    messages: hasJobs && Array.isArray(s.messages) ? s.messages : d.messages,
+    nextMessageId: hasJobs ? num(s.nextMessageId, d.nextMessageId) : d.nextMessageId,
+    minStock: hasJobs && s.minStock && typeof s.minStock === 'object' ? { ...s.minStock } : d.minStock,
+    stockAlerted: hasJobs && s.stockAlerted && typeof s.stockAlerted === 'object' ? { ...s.stockAlerted } : d.stockAlerted,
   };
 }

@@ -33,6 +33,83 @@ export interface Order {
   delayed: boolean;
 }
 
+/** Auftragsangebot eines Kunden (noch nicht angenommen). */
+export interface JobOffer {
+  id: number;
+  customer: string;
+  articleId: string;
+  qty: number;
+  /** Vereinbarter Stückpreis. */
+  unitPrice: number;
+  /** Frist in Spieltagen ab Annahme. */
+  deadlineDays: number;
+  /** Einfache Fahrzeit zum Kunden in Spielminuten. */
+  distance: number;
+  /** Letzter Tag, an dem das Angebot angenommen werden kann. */
+  expiresDay: number;
+}
+
+/** Angenommener Auftrag, wird in Touren beliefert. */
+export interface Job {
+  id: number;
+  customer: string;
+  articleId: string;
+  qty: number;
+  unitPrice: number;
+  distance: number;
+  acceptedAt: number;
+  /** Frist als Spielminute (Ende des Fristtags). */
+  deadline: number;
+  delivered: number;
+  inTransit: number;
+  /** Bereits bezahlter Betrag (pro Tour). */
+  paid: number;
+  cancelled: boolean;
+  /** Strafe bei Abbruch (wird beim Abschluss verbucht, falls noch eine Tour unterwegs war). */
+  cancelPenalty: number;
+  /** Meldung „Bestand reicht nicht“ schon verschickt (bis zur nächsten Tour). */
+  blockedNotified: boolean;
+  /** Meldung „überfällig“ schon verschickt. */
+  lateNotified: boolean;
+}
+
+export interface JobResult {
+  id: number;
+  customer: string;
+  articleId: string;
+  qty: number;
+  delivered: number;
+  revenue: number;
+  bonus: number;
+  penalty: number;
+  reputationDelta: number;
+  finishedAt: number;
+  outcome: 'onTime' | 'late' | 'cancelled';
+}
+
+export type VanPhase = 'idle' | 'loading' | 'outbound' | 'unloading' | 'returning';
+
+export interface Van {
+  phase: VanPhase;
+  jobId: number | null;
+  load: number;
+  phaseStart: number;
+  phaseEnd: number;
+}
+
+export type MessageKind = 'done' | 'stock' | 'blocked' | 'late' | 'delivery' | 'delay' | 'offer' | 'cancelled';
+
+export interface GameMessage {
+  id: number;
+  at: number;
+  kind: MessageKind;
+  title: string;
+  text: string;
+  read: boolean;
+  /** Wohin ein Tippen auf die Meldung führt. */
+  target?: { panel: 'orders' | 'storage' | 'trade'; articleId?: string };
+}
+
 export interface GameState {
   /** Geld in Euro. */
   money: number;
@@ -54,12 +131,27 @@ export interface GameState {
   shelves: number;
   /** Gebäudeausbau: 0 = Garage, 1 = Anbau 1, 2 = Anbau 2. */
   extension: number;
+  /** Ruf 0 … 100. */
+  reputation: number;
+  offers: JobOffer[];
+  jobs: Job[];
+  /** Zuletzt abgeschlossene Aufträge (neueste zuerst). */
+  completedJobs: JobResult[];
+  nextJobId: number;
+  van: Van;
+  messages: GameMessage[];
+  nextMessageId: number;
+  /** Eigene Mindestmenge je Artikel (0 = keine Warnung). */
+  minStock: Record<string, number>;
+  /** Für diese Artikel wurde „Bestand knapp“ schon gemeldet (bis wieder aufgefüllt). */
+  stockAlerted: Record<string, boolean>;
 }
 
 export const START_MONEY = 5000;
 /** Spielbeginn: Tag 1, 08:00 Uhr. */
 export const START_MINUTES = 8 * 60;
 export const START_SHELVES = 2;
+export const START_REPUTATION = 50;
 /** Startbestand, damit man sofort etwas verkaufen kann. */
 const START_STOCK: Record<string, number> = { akkuschrauber: 10 };
 
@@ -79,6 +171,16 @@ export function createInitialState(seed: number = randomSeed()): GameState {
     nextOrderId: 1,
     shelves: START_SHELVES,
     extension: 0,
+    reputation: START_REPUTATION,
+    offers: [],
+    jobs: [],
+    completedJobs: [],
+    nextJobId: 1,
+    van: { phase: 'idle', jobId: null, load: 0, phaseStart: 0, phaseEnd: 0 },
+    messages: [],
+    nextMessageId: 1,
+    minStock: {},
+    stockAlerted: {},
   };
 }
 
