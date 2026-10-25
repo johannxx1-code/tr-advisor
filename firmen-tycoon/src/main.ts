@@ -2,8 +2,10 @@
 
 import { deleteSave, loadGame, saveGame } from './persistence/save';
 import { GameScene } from './render/scene';
+import { getArticle } from './sim/catalog';
 import { Simulation } from './sim/simulation';
 import { createInitialState } from './sim/state';
+import { usedSlots } from './sim/storage';
 import { Hud } from './ui/hud';
 
 /** Automatisch speichern alle n Spieltage. */
@@ -28,6 +30,26 @@ const hud = new Hud(document.querySelector<HTMLElement>('#hud')!, {
     save();
     hud.toast('Neues Spiel gestartet');
   },
+  unlock: (id) => sim.unlockArticle(id),
+  order: (articleId, supplierId, qty) => sim.placeOrder(articleId, supplierId, qty),
+  sell: (articleId, qty) => sim.sell(articleId, qty),
+  buyShelf: () => sim.buyShelf(),
+  buildExtension: () => sim.buildExtension(),
+});
+
+const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+sim.on('delivery', ({ order, delivered, refund, delayedUntil }) => {
+  const name = getArticle(order.articleId).name;
+  if (delayedUntil !== undefined) {
+    hud.toast(`Verspätung: ${order.qty}× ${name} kommt erst an Tag ${delayedUntil}`, true);
+    return;
+  }
+  scene.playDelivery();
+  if (delivered < order.qty) {
+    hud.toast(`Teillieferung: ${delivered} von ${order.qty}× ${name} – ${euro.format(refund)} erstattet`, true);
+  } else {
+    hud.toast(`Lieferung eingetroffen: ${delivered}× ${name}`);
+  }
 });
 
 sim.on('dayChanged', ({ day }) => {
@@ -47,8 +69,13 @@ function frame(now: number): void {
   const dt = Math.min((now - lastTime) / 1000, MAX_FRAME_SECONDS);
   lastTime = now;
   sim.tick(dt);
-  hud.update(sim.state);
-  scene.render();
+  const state = sim.state;
+  hud.update(state, sim.revision);
+  scene.sync({ extension: state.extension, shelves: state.shelves, usedSlots: usedSlots(state) });
+  scene.render(dt);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+// Nur im Dev-Server: Zugriff für Tests und Debugging über die Browser-Konsole.
+if (import.meta.env.DEV) Object.assign(window, { __sim: sim, __scene: scene });

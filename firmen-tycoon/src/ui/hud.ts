@@ -1,28 +1,38 @@
 // HTML/CSS-Overlay: Statusleiste oben, Menüleiste unten, Panels. Keine Spiellogik.
 
+import { MONTH_NAMES, monthOf, seasonIcon, seasonOf, yearOf } from '../sim/calendar';
 import { formatClock, toGameTime } from '../sim/clock';
 import { companyLevelName, GAME_SPEEDS, type GameSpeed, type GameState } from '../sim/state';
+import { maxOrderQty, supplierOffers, type ActionResult } from '../sim/trade';
 import './hud.css';
+import { createPanelUiState, renderStorage, renderTrade, type PanelUiState, type TradeTab } from './panels';
 
 export interface HudActions {
   setSpeed(speed: GameSpeed): void;
   save(): void;
   newGame(): void;
+  unlock(articleId: string): ActionResult;
+  order(articleId: string, supplierId: string, qty: number): ActionResult;
+  sell(articleId: string, qty: number): ActionResult;
+  buyShelf(): ActionResult;
+  buildExtension(): ActionResult;
 }
 
 interface PanelDef {
   id: string;
   icon: string;
   label: string;
-  stage: number;
-  text: string;
+  /** Platzhalter: Stufe, in der das Panel kommt. */
+  stage?: number;
+  text?: string;
+  render?: (state: Readonly<GameState>, ui: PanelUiState) => string;
 }
 
 const PANELS: PanelDef[] = [
-  { id: 'purchase', icon: '🛒', label: 'Einkauf', stage: 2, text: 'Hier kaufst du später Ware bei Lieferanten ein – mit Preis, Lieferzeit und Zuverlässigkeit.' },
+  { id: 'trade', icon: '🔁', label: 'Handel', render: renderTrade },
   { id: 'orders', icon: '📋', label: 'Aufträge', stage: 3, text: 'Kundenaufträge mit Frist, Bonus und Vertragsstrafe erscheinen hier.' },
   { id: 'staff', icon: '👷', label: 'Personal', stage: 4, text: 'Mitarbeiter einstellen, Gehälter, Erfahrung und Motivation.' },
-  { id: 'storage', icon: '📦', label: 'Lager', stage: 5, text: 'Lagerbestand, Lagerplatz und Ausbau.' },
+  { id: 'storage', icon: '📦', label: 'Lager', render: (state) => renderStorage(state) },
   { id: 'finance', icon: '💶', label: 'Finanzen', stage: 4, text: 'Fixkosten, Kredite und Monatsbilanz.' },
   { id: 'upgrades', icon: '⭐', label: 'Upgrades', stage: 5, text: 'Upgrade-Baum und Firmenlevel.' },
 ];
@@ -34,22 +44,29 @@ const money = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR
 export class Hud {
   private readonly moneyEl: HTMLElement;
   private readonly levelEl: HTMLElement;
+  private readonly seasonEl: HTMLElement;
   private readonly dayEl: HTMLElement;
   private readonly clockEl: HTMLElement;
   private readonly speedButtons = new Map<GameSpeed, HTMLButtonElement>();
   private readonly panelEl: HTMLElement;
   private readonly menuEl: HTMLElement;
   private readonly toastEl: HTMLElement;
+  private readonly panelBody: HTMLElement;
   private readonly navButtons = new Map<string, HTMLButtonElement>();
   private openPanelId: string | null = null;
   private toastTimer = 0;
-  private last = { money: '', level: '', day: '', clock: '', speed: -1 };
+  private last = { money: '', level: '', season: '', day: '', clock: '', speed: -1 };
+  private readonly ui = createPanelUiState();
+  private state: Readonly<GameState> | null = null;
+  private renderedRevision = -1;
+  private panelDirty = false;
 
   constructor(root: HTMLElement, private readonly actions: HudActions) {
     root.innerHTML = `
       <header class="topbar">
         <div class="chip chip-money" title="Kontostand"><span class="chip-icon">💰</span><span data-ref="money"></span></div>
         <div class="chip chip-level" title="Firmenlevel"><span class="chip-icon">🏠</span><span data-ref="level"></span></div>
+        <div class="chip chip-season" data-ref="season"></div>
         <div class="topbar-spacer"></div>
         <div class="chip chip-time" title="Spielzeit">
           <span data-ref="day"></span><span class="time-sep">·</span><span data-ref="clock"></span>
@@ -79,11 +96,14 @@ export class Hud {
     const ref = <T extends HTMLElement = HTMLElement>(name: string) => root.querySelector<T>(`[data-ref="${name}"]`)!;
     this.moneyEl = ref('money');
     this.levelEl = ref('level');
+    this.seasonEl = ref('season');
     this.dayEl = ref('day');
     this.clockEl = ref('clock');
     this.panelEl = ref('panel');
     this.menuEl = ref('menu');
     this.toastEl = ref('toast');
+    this.panelBody = ref('panelBody');
+    this.panelBody.addEventListener('click', this.onPanelClick);
 
     const speedGroup = root.querySelector<HTMLElement>('.speed')!;
     for (const speed of GAME_SPEEDS) {
@@ -131,30 +151,46 @@ export class Hud {
     window.addEventListener('keydown', this.onKey);
   }
 
-  /** Wird jedes Frame aufgerufen; schreibt nur bei Änderungen ins DOM. */
-  update(state: Readonly<GameState>): void {
+  /**
+   * Wird jedes Frame aufgerufen; schreibt nur bei Änderungen ins DOM.
+   * `revision` zählt Zustandsänderungen der Simulation – dann wird ein offenes Panel neu gezeichnet.
+   */
+  update(state: Readonly<GameState>, revision: number): void {
+    this.state = state;
     const time = toGameTime(state.minutes);
+    const month = monthOf(time.day);
+    const season = seasonOf(month);
     this.set('money', this.moneyEl, money.format(state.money));
     this.set('level', this.levelEl, `Lv ${state.companyLevel} · ${companyLevelName(state.companyLevel)}`);
+    if (this.set('season', this.seasonEl, `${seasonIcon(season)} ${MONTH_NAMES[month]}`)) {
+      this.seasonEl.title = `${season}, Jahr ${yearOf(time.day)}`;
+    }
     this.set('day', this.dayEl, `Tag ${time.day}`);
     this.set('clock', this.clockEl, formatClock(time));
     if (this.last.speed !== state.speed) {
       this.last.speed = state.speed;
       for (const [speed, btn] of this.speedButtons) btn.classList.toggle('active', speed === state.speed);
     }
+    if (this.openPanelId && (this.panelDirty || revision !== this.renderedRevision)) {
+      this.renderedRevision = revision;
+      this.panelDirty = false;
+      this.renderPanelBody();
+    }
   }
 
-  toast(message: string): void {
+  toast(message: string, isError = false): void {
     this.toastEl.textContent = message;
+    this.toastEl.classList.toggle('error', isError);
     this.toastEl.hidden = false;
     window.clearTimeout(this.toastTimer);
-    this.toastTimer = window.setTimeout(() => (this.toastEl.hidden = true), 1800);
+    this.toastTimer = window.setTimeout(() => (this.toastEl.hidden = true), isError ? 3000 : 2200);
   }
 
-  private set(key: 'money' | 'level' | 'day' | 'clock', el: HTMLElement, value: string): void {
-    if (this.last[key] === value) return;
+  private set(key: 'money' | 'level' | 'season' | 'day' | 'clock', el: HTMLElement, value: string): boolean {
+    if (this.last[key] === value) return false;
     this.last[key] = value;
     el.textContent = value;
+    return true;
   }
 
   private togglePanel(id: string | null): void {
@@ -167,11 +203,98 @@ export class Hud {
       return;
     }
     this.panelEl.querySelector('[data-ref="panelTitle"]')!.textContent = `${def.icon} ${def.label}`;
-    this.panelEl.querySelector('[data-ref="panelBody"]')!.innerHTML = `
-      <p class="placeholder">${def.text}</p>
-      <p class="placeholder-note">Kommt in Stufe ${def.stage}.</p>`;
     this.panelEl.hidden = false;
+    this.panelBody.scrollTop = 0;
+    this.renderPanelBody();
   }
+
+  private renderPanelBody(): void {
+    const def = PANELS.find((p) => p.id === this.openPanelId);
+    if (!def) return;
+    if (def.render && this.state) {
+      // Scrollposition beim Neuzeichnen behalten
+      const scroll = this.panelBody.scrollTop;
+      this.panelBody.innerHTML = def.render(this.state, this.ui);
+      this.panelBody.scrollTop = scroll;
+    } else {
+      this.panelBody.innerHTML = `
+        <p class="placeholder">${def.text ?? ''}</p>
+        <p class="placeholder-note">Kommt in Stufe ${def.stage}.</p>`;
+    }
+  }
+
+  private report(result: ActionResult): void {
+    this.toast(result.ok ? result.message : result.error, !result.ok);
+    this.panelDirty = true;
+  }
+
+  private onPanelClick = (e: Event): void => {
+    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
+    if (!el || (el as HTMLButtonElement).disabled || !this.state) return;
+    const state = this.state;
+    const ui = this.ui;
+    const id = el.dataset.id ?? '';
+    switch (el.dataset.act) {
+      case 'tab':
+        ui.tradeTab = el.dataset.tab as TradeTab;
+        this.panelBody.scrollTop = 0;
+        break;
+      case 'pick':
+        ui.buyArticle = id;
+        ui.buySupplier = null;
+        this.panelBody.scrollTop = 0;
+        break;
+      case 'back':
+        ui.buyArticle = null;
+        break;
+      case 'supplier':
+        ui.buySupplier = id;
+        break;
+      case 'buyqty': {
+        const offers = ui.buyArticle ? supplierOffers(state, ui.buyArticle) : [];
+        const offer = offers.find((o) => o.supplier.id === ui.buySupplier) ?? offers[0];
+        const max = offer && ui.buyArticle ? maxOrderQty(state, ui.buyArticle, offer) : 0;
+        ui.buyQty = stepQty(Math.min(ui.buyQty, max), el.dataset.d, max);
+        break;
+      }
+      case 'order': {
+        const offers = ui.buyArticle ? supplierOffers(state, ui.buyArticle) : [];
+        const offer = offers.find((o) => o.supplier.id === ui.buySupplier) ?? offers[0];
+        if (!ui.buyArticle || !offer) return;
+        const qty = Math.min(ui.buyQty, maxOrderQty(state, ui.buyArticle, offer));
+        this.report(this.actions.order(ui.buyArticle, offer.supplier.id, qty));
+        break;
+      }
+      case 'unlock':
+        this.report(this.actions.unlock(id));
+        break;
+      case 'sellpick':
+        ui.sellArticle = ui.sellArticle === id ? null : id;
+        ui.sellQty = state.inventory[id] ?? 1;
+        break;
+      case 'sellqty': {
+        const stock = ui.sellArticle ? state.inventory[ui.sellArticle] ?? 0 : 0;
+        ui.sellQty = Math.max(1, stepQty(Math.min(ui.sellQty, stock), el.dataset.d, stock));
+        break;
+      }
+      case 'sell': {
+        const stock = state.inventory[id] ?? 0;
+        const result = this.actions.sell(id, Math.min(ui.sellQty, stock));
+        if (result.ok && !(this.state.inventory[id] > 0)) ui.sellArticle = null;
+        this.report(result);
+        break;
+      }
+      case 'shelf':
+        this.report(this.actions.buyShelf());
+        break;
+      case 'extend':
+        this.report(this.actions.buildExtension());
+        break;
+      default:
+        return;
+    }
+    this.panelDirty = true;
+  };
 
   private onKey = (e: KeyboardEvent): void => {
     if (e.target instanceof HTMLInputElement) return;
@@ -186,4 +309,10 @@ export class Hud {
       this.menuEl.hidden = true;
     }
   };
+}
+
+/** Menge um `d` ändern („max“ = Maximum), begrenzt auf 0 … max. */
+function stepQty(current: number, d: string | undefined, max: number): number {
+  if (d === 'max') return max;
+  return Math.max(0, Math.min(max, current + Number(d ?? 0)));
 }

@@ -29,13 +29,23 @@ Stack: **Vite + TypeScript + Three.js**, keine weiteren Frameworks. Sprache im S
 ## Roadmap
 
 1. Grundgerüst (Szene, Kamera, Spielzeit, HUD, Speichern/Laden, responsiv) ✅
-2. Handel (Einkauf/Verkauf, Lieferanten, Marktpreise)
+2. Handel (Einkauf/Verkauf, Lieferanten, Marktpreise, einfacher Lagerausbau) ✅
 3. Aufträge & Ruf
 4. Personal & Finanzen
-5. Lagerausbau & Level/Upgrades
+5. Großer Lagerausbau (Umzug Halle …) & Level/Upgrades
 6. Produktion
 7. Ereignisse / Konkurrenz / Idle-Fortschritt
 8. Mobile-PWA / Sound / Balancing
+
+## Stand Stufe 2 (Entscheidungen)
+
+- Start mit 1 Artikel (Akkuschrauber 18V, 10 Stk Startbestand); weitere 11 Artikel gegen Einmalgebühr freischalten.
+- Verkauf **manuell an Händler** zum Tages-Marktpreis; jedes verkaufte Stück senkt den Ankaufpreis um 1 %, der Druck halbiert sich über Nacht.
+- 6 Lieferanten mit Preisfaktor, Lieferzeit, Zuverlässigkeit (Verspätung oder Teillieferung mit Erstattung), Versandpauschale; Bezahlung bei Bestellung.
+- Kalender: 1 Monat = 10 Spieltage, Spielbeginn 1. März. Saisonkurven je Artikel in `sim/catalog.ts`.
+- Lager: Regal = 20 Plätze; erst alle Regalplätze im Gebäude füllen, dann Anbau 1 (+6) bzw. Anbau 2 (+8). In 3D sichtbar, Ware füllt die Regale der Reihe nach.
+- UI: Panel „Handel“ mit Reitern Einkauf / Verkauf / Unterwegs; Panel „Lager“ mit Bestand und Ausbau.
+- Alle Zahlen sind Startwerte; Balancing in Stufe 8.
 
 ## Architekturregeln (verbindlich)
 
@@ -66,6 +76,7 @@ src/
 - `npm install` – Abhängigkeiten
 - `npm run dev` – Dev-Server (auch im WLAN erreichbar, siehe Konsolenausgabe „Network“)
 - `npm run typecheck` – TypeScript-Prüfung
+- `npm test` – Tests der Simulation (vitest, laufen ohne Browser); prüft auch, dass `src/sim/` keine Browser-/Three.js-APIs nutzt
 - `npm run build` – Produktions-Build nach `dist/`
 
 ## Konventionen

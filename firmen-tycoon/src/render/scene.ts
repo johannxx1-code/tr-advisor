@@ -1,18 +1,29 @@
-// Three.js-Szene: Renderer, Licht, Welt und Kamera. Liest keinen Spielzustand direkt.
+// Three.js-Szene: Renderer, Licht, Welt und Kamera. Bekommt vom Hauptprogramm nur eine schlanke Ansicht des Spielstands.
 
 import * as THREE from 'three';
+import { BuildingView } from './building';
 import { CameraController } from './cameraController';
+import { DeliveryTruck } from './delivery';
 import { PALETTE } from './palette';
 import { buildWorld, type World } from './world';
 
 /** Ab diesem Zoomgrad (0…1) werden Kleinteile im Gebäude eingeblendet. */
 const DETAIL_ZOOM = 0.68;
 
+/** Was die Szene vom Spielstand wissen muss. */
+export interface SceneView {
+  extension: number;
+  shelves: number;
+  usedSlots: number;
+}
+
 export class GameScene {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly camera: THREE.PerspectiveCamera;
   private readonly world: World;
+  private readonly building = new BuildingView();
+  private readonly truck = new DeliveryTruck();
   readonly controls: CameraController;
   private needsRender = true;
 
@@ -48,7 +59,7 @@ export class GameScene {
     this.scene.add(sun);
 
     this.world = buildWorld();
-    this.scene.add(this.world.root);
+    this.scene.add(this.world.root, this.building.root, this.truck.object);
 
     this.controls = new CameraController(this.camera, canvas, this.world.bounds);
     this.resize();
@@ -67,12 +78,26 @@ export class GameScene {
     this.needsRender = true;
   };
 
-  /** Rendert nur, wenn sich etwas geändert hat (schont Akku auf dem Handy). */
-  render(): void {
-    if (this.controls.consumeChanged()) {
-      this.world.details.visible = this.controls.zoomLevel >= DETAIL_ZOOM;
+  /** Gleicht Gebäude, Regale und Füllstand an (billig, wenn sich nichts geändert hat). */
+  sync(view: SceneView): void {
+    if (this.building.sync(view.extension, view.shelves, view.usedSlots)) {
+      this.building.details.visible = this.controls.zoomLevel >= DETAIL_ZOOM;
       this.needsRender = true;
     }
+  }
+
+  /** Lieferwagen fährt vor. */
+  playDelivery(): void {
+    this.truck.deliver();
+  }
+
+  /** Rendert nur, wenn sich etwas geändert hat (schont Akku auf dem Handy). */
+  render(dt: number): void {
+    if (this.controls.consumeChanged()) {
+      this.building.details.visible = this.controls.zoomLevel >= DETAIL_ZOOM;
+      this.needsRender = true;
+    }
+    if (this.truck.update(dt)) this.needsRender = true;
     if (!this.needsRender) return;
     this.needsRender = false;
     this.renderer.render(this.scene, this.camera);
