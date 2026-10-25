@@ -3,7 +3,7 @@
 import { createInitialState, GAME_SPEEDS, type GameState } from '../sim/state';
 
 /** Bei jeder inkompatiblen Änderung an GameState erhöhen und migrate() ergänzen. */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 const STORAGE_KEY = 'firmen-tycoon.save';
 
 interface SaveFile {
@@ -59,16 +59,29 @@ export function deleteSave(): void {
 }
 
 /** Bringt ältere Spielstände auf den aktuellen Stand und füllt fehlende Felder auf. */
-function migrate(version: number, state: unknown): GameState {
-  const s = state as Partial<GameState>;
-  // Platz für künftige Migrationen, z. B.:
-  // if (version < 2) { s.reputation = 50; }
-  void version;
-  const defaults = createInitialState();
+export function migrate(version: number, state: unknown): GameState {
+  const s = (state ?? {}) as Partial<GameState>;
+  const d = createInitialState();
+  const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+
+  // v1 → v2: Handel (Sortiment, Lager, Markt, Bestellungen) kommt hinzu – Startwerte übernehmen.
+  const hasTrade = version >= 2;
+  const market = { ...d.market };
+  if (hasTrade && s.market && typeof s.market === 'object') {
+    for (const id of Object.keys(market)) if (s.market[id]) market[id] = { ...market[id], ...s.market[id] };
+  }
   return {
-    money: typeof s.money === 'number' ? s.money : defaults.money,
-    companyLevel: typeof s.companyLevel === 'number' ? s.companyLevel : defaults.companyLevel,
-    minutes: typeof s.minutes === 'number' ? s.minutes : defaults.minutes,
-    speed: GAME_SPEEDS.includes(s.speed as never) ? (s.speed as GameState['speed']) : defaults.speed,
+    money: num(s.money, d.money),
+    companyLevel: num(s.companyLevel, d.companyLevel),
+    minutes: num(s.minutes, d.minutes),
+    speed: GAME_SPEEDS.includes(s.speed as never) ? (s.speed as GameState['speed']) : d.speed,
+    rng: hasTrade ? num(s.rng, d.rng) : d.rng,
+    unlocked: hasTrade && Array.isArray(s.unlocked) ? s.unlocked.filter((id) => typeof id === 'string') : d.unlocked,
+    inventory: hasTrade && s.inventory && typeof s.inventory === 'object' ? { ...s.inventory } : d.inventory,
+    market,
+    orders: hasTrade && Array.isArray(s.orders) ? s.orders : d.orders,
+    nextOrderId: hasTrade ? num(s.nextOrderId, d.nextOrderId) : d.nextOrderId,
+    shelves: hasTrade ? num(s.shelves, d.shelves) : d.shelves,
+    extension: hasTrade ? num(s.extension, d.extension) : d.extension,
   };
 }

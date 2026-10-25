@@ -1,12 +1,15 @@
-// Simulationskern: Zustand + Zeitfortschritt. Kein DOM, kein Three.js.
+// Simulationskern: Zustand, Zeitfortschritt und Aktionen. Kein DOM, kein Three.js.
 
 import { dayOf, MINUTES_PER_REAL_SECOND } from './clock';
+import { updateMarketDaily } from './market';
 import { createInitialState, type GameSpeed, type GameState } from './state';
+import * as trade from './trade';
 
 export interface SimEvents {
   dayChanged: { day: number };
   speedChanged: { speed: GameSpeed };
   stateReplaced: { state: GameState };
+  delivery: trade.DeliveryReport;
 }
 
 type Listener<T> = (payload: T) => void;
@@ -14,6 +17,8 @@ type Listener<T> = (payload: T) => void;
 export class Simulation {
   private _state: GameState;
   private listeners: { [K in keyof SimEvents]?: Listener<SimEvents[K]>[] } = {};
+  /** Zählt jede Zustandsänderung außer dem reinen Uhrzeit-Fortschritt (für UI-Aktualisierung). */
+  private _revision = 0;
 
   constructor(state: GameState = createInitialState()) {
     this._state = state;
@@ -21,6 +26,10 @@ export class Simulation {
 
   get state(): Readonly<GameState> {
     return this._state;
+  }
+
+  get revision(): number {
+    return this._revision;
   }
 
   on<K extends keyof SimEvents>(event: K, listener: Listener<SimEvents[K]>): () => void {
@@ -52,21 +61,57 @@ export class Simulation {
     const before = dayOf(this._state.minutes);
     this._state.minutes += minutes;
     const after = dayOf(this._state.minutes);
-    // Jeder übersprungene Tag wird einzeln gemeldet, damit Tageslogik nichts verpasst.
+    // Jeder übersprungene Tag wird einzeln verarbeitet, damit Tageslogik nichts verpasst.
     for (let day = before + 1; day <= after; day++) {
-      this.emit('dayChanged', { day });
+      this.startDay(day);
     }
+  }
+
+  private startDay(day: number): void {
+    updateMarketDaily(this._state);
+    for (const report of trade.processOrders(this._state, day)) this.emit('delivery', report);
+    this._revision++;
+    this.emit('dayChanged', { day });
   }
 
   setSpeed(speed: GameSpeed): void {
     if (this._state.speed === speed) return;
     this._state.speed = speed;
+    this._revision++;
     this.emit('speedChanged', { speed });
   }
 
   /** Ersetzt den gesamten Zustand (Laden / Neues Spiel). */
   replaceState(state: GameState): void {
     this._state = state;
+    this._revision++;
     this.emit('stateReplaced', { state });
+  }
+
+  // ---------- Aktionen ----------
+
+  unlockArticle(articleId: string): trade.ActionResult {
+    return this.apply(trade.unlockArticle(this._state, articleId));
+  }
+
+  placeOrder(articleId: string, supplierId: string, qty: number): trade.ActionResult {
+    return this.apply(trade.placeOrder(this._state, articleId, supplierId, qty));
+  }
+
+  sell(articleId: string, qty: number): trade.ActionResult {
+    return this.apply(trade.sell(this._state, articleId, qty));
+  }
+
+  buyShelf(): trade.ActionResult {
+    return this.apply(trade.buyShelf(this._state));
+  }
+
+  buildExtension(): trade.ActionResult {
+    return this.apply(trade.buildExtension(this._state));
+  }
+
+  private apply(result: trade.ActionResult): trade.ActionResult {
+    if (result.ok) this._revision++;
+    return result;
   }
 }
