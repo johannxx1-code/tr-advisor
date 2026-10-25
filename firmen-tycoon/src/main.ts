@@ -2,6 +2,7 @@
 
 import { deleteSave, loadGame, saveGame } from './persistence/save';
 import { GameScene } from './render/scene';
+import { getArticle } from './sim/catalog';
 import { offlineMinutes } from './sim/clock';
 import { Simulation } from './sim/simulation';
 import { createInitialState } from './sim/state';
@@ -31,7 +32,7 @@ const hud = new Hud(document.querySelector<HTMLElement>('#hud')!, {
     hud.toast('Neues Spiel gestartet');
   },
   unlock: (id) => sim.unlockArticle(id),
-  order: (articleId, supplierId, qty) => sim.placeOrder(articleId, supplierId, qty),
+  order: (articleId, supplierId, qty, express) => sim.placeOrder(articleId, supplierId, qty, express),
   sell: (articleId, qty) => sim.sell(articleId, qty),
   buyShelf: () => sim.buyShelf(),
   buildExtension: () => sim.buildExtension(),
@@ -40,6 +41,15 @@ const hud = new Hud(document.querySelector<HTMLElement>('#hud')!, {
   cancelJob: (id) => sim.cancelJob(id),
   setMinStock: (articleId, value) => sim.setMinStock(articleId, value),
   markMessagesRead: () => sim.markMessagesRead(),
+  expediteOrder: (id) => sim.expediteOrder(id),
+  helpOut: () => sim.helpOut(),
+  hireHelper: () => sim.hireHelper(),
+  fireHelper: () => sim.fireHelper(),
+  buyVan: () => sim.buyVan(),
+});
+
+sim.on('stored', ({ articleId, qty }) => {
+  if (!catchingUp) hud.toast(`Eingeräumt: ${qty}× ${getArticle(articleId).name}`);
 });
 
 /** Während des Nachrechnens keine Einzel-Hinweise, sondern am Ende eine Zusammenfassung. */
@@ -119,7 +129,8 @@ function frame(now: number): void {
   hud.update(state, sim.revision);
   scene.sync({
     extension: state.extension, shelves: state.shelves, usedSlots: usedSlots(state),
-    minutes: state.minutes, van: state.van,
+    minutes: state.minutes, vans: state.vans, inbound: state.inbound, helper: state.helper,
+    working: !!state.storing || state.vans.some((v) => v.phase === 'loading'),
   });
   scene.render(dt);
   requestAnimationFrame(frame);

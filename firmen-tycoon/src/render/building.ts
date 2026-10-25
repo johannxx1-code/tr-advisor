@@ -42,10 +42,55 @@ export class BuildingView {
   private shelves: ShelfMeshes[] = [];
   private extension = -1;
   private fillKey = '';
+  private readonly pallets = new THREE.Group();
+  private palletKey = '';
+  private readonly helper = buildHelperFigure();
+  private helperTime = 0;
 
   constructor() {
     this.root.position.set(-2, 0, 0);
-    this.root.add(this.shell, this.shelfGroup, this.details);
+    this.helper.position.set(-0.2, 0.1, 2.0);
+    this.helper.visible = false;
+    this.root.add(this.shell, this.shelfGroup, this.details, this.pallets, this.helper);
+  }
+
+  /** Paletten im Wareneingang (am Tor) und Aushilfe. Gibt true zurück, wenn sich etwas geändert hat. */
+  syncProps(inbound: { articleId: string; qty: number }[], helper: boolean): boolean {
+    let changed = false;
+    const key = inbound.map((p) => p.qty).join(',');
+    if (key !== this.palletKey) {
+      this.palletKey = key;
+      disposeGroup(this.pallets);
+      this.pallets.clear();
+      // Bis zu 4 Stellplätze innen am Tor, Kartonstapel je nach Menge
+      inbound.slice(0, 4).forEach((p, i) => {
+        const x = -2.4 + (i % 2) * 1.5;
+        const z = i < 2 ? 2.9 : 1.6;
+        const pallet = new THREE.Group();
+        pallet.add(box(1.2, 0.14, 1.0, PALETTE.shelfWood, 0, 0.17, 0));
+        const layers = Math.min(4, Math.max(1, Math.ceil(p.qty / 15)));
+        for (let l = 0; l < layers; l++) {
+          pallet.add(box(1.0, 0.36, 0.85, PALETTE.box[(i + l) % 3], 0, 0.42 + l * 0.38, 0));
+        }
+        pallet.position.set(x, 0, z);
+        this.pallets.add(pallet);
+      });
+      changed = true;
+    }
+    if (this.helper.visible !== helper) {
+      this.helper.visible = helper;
+      changed = true;
+    }
+    return changed;
+  }
+
+  /** Aushilfe „arbeitet“ (wippt), solange verladen oder eingeräumt wird. */
+  animateHelper(dt: number): boolean {
+    if (!this.helper.visible) return false;
+    this.helperTime += dt;
+    this.helper.position.y = 0.1 + Math.abs(Math.sin(this.helperTime * 6)) * 0.12;
+    this.helper.rotation.y = Math.sin(this.helperTime * 1.5) * 0.8;
+    return true;
   }
 
   /** Gleicht Gebäude, Regale und Füllstand mit dem Spielstand ab. Gibt true zurück, wenn sich etwas geändert hat. */
@@ -224,4 +269,20 @@ function buildShelf(rand: () => number): ShelfMeshes {
     }
   }
   return { frame, boxes };
+}
+
+/** Einfache Low-Poly-Figur (Aushilfe mit Warnweste). */
+function buildHelperFigure(): THREE.Group {
+  const g = new THREE.Group();
+  const legs = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.75, 6), mat(PALETTE.chair));
+  legs.position.y = 0.38;
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.65, 6), mat(PALETTE.vanAccent));
+  body.position.y = 1.05;
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.18, 0), mat(0xe8c4a0));
+  head.position.y = 1.55;
+  for (const m of [legs, body, head]) {
+    m.castShadow = true;
+    g.add(m);
+  }
+  return g;
 }

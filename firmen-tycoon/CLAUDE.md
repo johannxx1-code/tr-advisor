@@ -55,6 +55,15 @@ Stack: **Vite + TypeScript + Three.js**, keine weiteren Frameworks. Sprache im S
 - Meldungen (Postfach 🔔, gespeichert im Spielstand): Auftrag fertig, Touren pausiert (Bestand fehlt), überfällig, eigene Mindestmenge unterschritten, Lieferungen/Verspätungen. Angebote nur als Zähler am Knopf „Aufträge“.
 - Zeit: im Spiel schnell (1× = 12 Spielminuten pro Sekunde). Im Hintergrund (Spiel zu oder Tab verdeckt) **Echtzeit** (1 min = 1 Spielminute), max. 30 Spieltage; bei Pause kein Nachrechnen. Danach Zusammenfassung „Während du weg warst“.
 
+## Stand Beschleuniger (Erweiterung nach Stufe 3)
+
+- Gelieferte Ware landet im **Wareneingang** (Paletten am Tor) und wird eingeräumt: 30 Min. + 1 Min./Stk, nur 6–18 Uhr; erst danach verkauf-/verladbar.
+- Verladen (1 Std. + 3 Min./Stk) und Einräumen sind „Arbeit“ (`WorkProgress`): **Mit anpacken** (Knopf 💪) spart pro Tipp 1 Stück, max. 50 %; Verladen hat Vorrang.
+- **Aushilfe** (vorläufig, unter „Personal“): 90 €/Tag, Arbeit ×2, kündigt bei Geldmangel.
+- **Zweiter Firmenwagen**: 12.000 € + 25 €/Tag Unterhalt, eigener Park- und Ladeplatz.
+- **Express** beim Bestellen oder nachträglich: halbe (Rest-)Lieferzeit, +5 % Zuverlässigkeit, +25 % vom Warenwert (mind. 30 €).
+- Spielstand v4.
+
 ## Später / offene Richtungsentscheidungen
 
 - **Eigenes Hosting auf dem Rechner des Nutzers** (statt Artifact-Link), damit echte Benachrichtigungen (Push/PWA) möglich werden. Vor jeder Einrichtung dort die Systemstand-Regeln des Nutzers beachten.

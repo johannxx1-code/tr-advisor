@@ -14,7 +14,7 @@ const euroWhole = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 
 const euro = (v: number) => euroFmt.format(v);
 
 const ICONS: Record<GameMessage['kind'], string> = {
-  done: '✅', stock: '⚠️', blocked: '⏸️', late: '⏰', delivery: '🚚', delay: '🐢', offer: '📋', cancelled: '✖️',
+  done: '✅', stock: '⚠️', blocked: '⏸️', late: '⏰', delivery: '🚚', delay: '🐢', offer: '📋', cancelled: '✖️', staff: '👷',
 };
 
 function hoursText(minutes: number): string {
@@ -78,12 +78,16 @@ function renderOffers(state: Readonly<GameState>): string {
 const PHASES: [VanPhase, string][] = [['loading', 'Verladen'], ['outbound', 'Hinfahrt'], ['unloading', 'Abladen'], ['returning', 'Rückfahrt']];
 
 function vanSteps(state: Readonly<GameState>, job: Job): string {
-  const van = state.van;
-  if (van.jobId !== job.id || van.phase === 'idle') return '';
-  const idx = PHASES.findIndex(([p]) => p === van.phase);
-  const steps = PHASES.map(([, label], i) => `<span class="${i < idx ? 'done' : i === idx ? 'on' : ''}">${label}</span>`).join('');
-  return `<div class="steps">${steps}</div>
-    <small class="muted">${van.phase === 'returning' ? 'leer' : `${van.load} Stk an Bord`} · ${PHASES[idx][1]} bis ${formatClock(toGameTime(van.phaseEnd))}</small>`;
+  const multi = state.vans.length > 1;
+  return state.vans
+    .filter((van) => van.jobId === job.id && van.phase !== 'idle')
+    .map((van) => {
+      const idx = PHASES.findIndex(([p]) => p === van.phase);
+      const steps = PHASES.map(([, label], i) => `<span class="${i < idx ? 'done' : i === idx ? 'on' : ''}">${label}</span>`).join('');
+      return `<div class="steps">${steps}</div>
+        <small class="muted">${multi ? `Wagen ${van.id}: ` : ''}${van.phase === 'returning' ? 'leer' : `${van.load} Stk an Bord`} · ${PHASES[idx][1]} bis ${formatClock(toGameTime(van.phaseEnd))}</small>`;
+    })
+    .join('');
 }
 
 function renderActive(state: Readonly<GameState>): string {
@@ -117,9 +121,9 @@ function renderActive(state: Readonly<GameState>): string {
       ${!job.cancelled && left > 0 ? `<div class="card-acts"><button class="btn ghost" data-act="cancel" data-id="${job.id}">Abbrechen (−${Math.round(CANCEL_RATE * 100)} % vom Rest)</button></div>` : ''}
     </div>`;
   });
-  const van = state.van;
-  const vanLine = van.phase === 'idle'
-    ? '<p class="hint">🚚 Firmenwagen steht auf dem Hof. Touren starten zwischen 6 und 18 Uhr.</p>'
+  const idle = state.vans.filter((v) => v.phase === 'idle').length;
+  const vanLine = idle > 0
+    ? `<p class="hint">🚚 ${idle === 1 ? 'Ein Firmenwagen steht' : `${idle} Firmenwagen stehen`} auf dem Hof. Touren starten zwischen 6 und 18 Uhr.</p>`
     : '';
   return `${vanLine}<div class="list">${cards.join('')}</div>`;
 }

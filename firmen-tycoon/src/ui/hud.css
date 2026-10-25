@@ -392,3 +392,56 @@ button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px;
   .speed button { min-width: 34px; }
   .chip { padding: 0 8px; }
 }
+/* ---------- Mit anpacken, Express, Wareneingang ---------- */
+.work {
+  position: absolute;
+  left: calc(12px + var(--safe-left));
+  bottom: calc(96px + var(--safe-bottom));
+  display: flex; align-items: flex-end; gap: 10px;
+  z-index: 15;
+}
+.work[hidden] { display: none; }
+.work-task {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; width: 230px;
+  padding: 8px 10px; border-radius: 12px; background: var(--ui-bg); border: 1px solid var(--ui-border); box-shadow: var(--ui-shadow);
+}
+.work-task b { font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.work-task small { font-size: 0.75rem; color: var(--ui-muted); font-variant-numeric: tabular-nums; }
+.fab {
+  flex: none; width: 84px; height: 84px; border-radius: 50%;
+  background: var(--ui-accent); color: #fff; font-weight: 800; font-size: 0.8rem;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border: 5px solid var(--ui-accent-soft); box-shadow: 0 6px 18px rgba(40, 30, 20, 0.35);
+  touch-action: manipulation; -webkit-user-select: none; user-select: none;
+}
+.fab-icon { font-size: 1.8rem; line-height: 1; }
+.fab:disabled { background: var(--free); color: var(--ui-muted); box-shadow: var(--ui-shadow); }
+.fab.pulse { animation: fab-pulse 0.18s ease-out; }
+@keyframes fab-pulse { 50% { transform: scale(0.92); } }
+.tap-float {
+  position: fixed; z-index: 50; pointer-events: none;
+  padding: 2px 8px; border-radius: 999px; background: var(--ok); color: #fff; font-weight: 800; font-size: 0.8rem;
+  animation: tap-float 0.9s ease-out forwards;
+}
+@keyframes tap-float { to { transform: translateY(-50px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .fab.pulse, .tap-float { animation: none; }
+}
+
+.toggle-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: 10px; background: var(--row); text-align: left; }
+.switch { flex: none; width: 42px; height: 24px; border-radius: 12px; background: var(--free); position: relative; transition: background 0.15s; }
+.switch::after { content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: left 0.15s; }
+.toggle-row.on { background: var(--ui-accent-soft); }
+.toggle-row.on .switch { background: var(--ok); }
+.toggle-row.on .switch::after { left: 21px; }
+
+.capacity .bar .inbound { background: #b98a5a; }
+.dot.inbound { background: #b98a5a; }
+.row-main .prog { margin-top: 4px; }
+
+@media (max-width: 600px) {
+  /* Am Handy rechts für den Daumen; bei offenem Panel ausblenden */
+  .work { left: auto; right: calc(10px + var(--safe-right)); bottom: calc(84px + var(--safe-bottom)); flex-direction: column; align-items: flex-end; gap: 6px; }
+  .work-task { width: min(260px, calc(100vw - 32px)); }
+  .panel-open .work { display: none; }
+}

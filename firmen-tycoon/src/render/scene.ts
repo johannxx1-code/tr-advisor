@@ -16,9 +16,13 @@ export interface SceneView {
   extension: number;
   shelves: number;
   usedSlots: number;
-  /** Aktuelle Spielminute (für den Firmenwagen). */
+  /** Aktuelle Spielminute (für die Firmenwagen). */
   minutes: number;
-  van: VanView;
+  vans: VanView[];
+  inbound: { articleId: string; qty: number }[];
+  helper: boolean;
+  /** Wird gerade verladen oder eingeräumt? (Aushilfe bewegt sich) */
+  working: boolean;
 }
 
 export class GameScene {
@@ -28,7 +32,8 @@ export class GameScene {
   private readonly world: World;
   private readonly building = new BuildingView();
   private readonly truck = new DeliveryTruck();
-  private readonly companyVan = new CompanyVan();
+  private readonly companyVans: CompanyVan[] = [];
+  private working = false;
   readonly controls: CameraController;
   private needsRender = true;
 
@@ -64,7 +69,7 @@ export class GameScene {
     this.scene.add(sun);
 
     this.world = buildWorld();
-    this.scene.add(this.world.root, this.building.root, this.truck.object, this.companyVan.object);
+    this.scene.add(this.world.root, this.building.root, this.truck.object);
 
     this.controls = new CameraController(this.camera, canvas, this.world.bounds);
     this.resize();
@@ -89,7 +94,16 @@ export class GameScene {
       this.building.details.visible = this.controls.zoomLevel >= DETAIL_ZOOM;
       this.needsRender = true;
     }
-    if (this.companyVan.update(view.van, view.minutes)) this.needsRender = true;
+    while (this.companyVans.length < view.vans.length) {
+      const van = new CompanyVan(this.companyVans.length);
+      this.companyVans.push(van);
+      this.scene.add(van.object);
+    }
+    view.vans.forEach((v, i) => {
+      if (this.companyVans[i].update(v, view.minutes)) this.needsRender = true;
+    });
+    if (this.building.syncProps(view.inbound, view.helper)) this.needsRender = true;
+    this.working = view.helper && view.working;
   }
 
   /** Lieferanten-Lkw fährt vor. */
@@ -104,6 +118,7 @@ export class GameScene {
       this.needsRender = true;
     }
     if (this.truck.update(dt)) this.needsRender = true;
+    if (this.working && this.building.animateHelper(dt)) this.needsRender = true;
     if (!this.needsRender) return;
     this.needsRender = false;
     this.renderer.render(this.scene, this.camera);

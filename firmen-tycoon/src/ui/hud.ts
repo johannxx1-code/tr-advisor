@@ -6,6 +6,9 @@ import { companyLevelName, GAME_SPEEDS, type GameSpeed, type GameState } from '.
 import { unreadCount } from '../sim/messages';
 import { maxOrderQty, supplierOffers, type ActionResult } from '../sim/trade';
 import './hud.css';
+import { getArticle } from '../sim/catalog';
+import { tapTarget, workMinutesLeft, type TapResult } from '../sim/work';
+import { renderStaff } from './staffPanel';
 import { renderMessages, renderOrders, renderSummary, type CatchUpSummary, type OrdersTab } from './jobsPanel';
 import { createPanelUiState, renderStorage, renderTrade, type PanelUiState, type TradeTab } from './panels';
 
@@ -14,7 +17,7 @@ export interface HudActions {
   save(): void;
   newGame(): void;
   unlock(articleId: string): ActionResult;
-  order(articleId: string, supplierId: string, qty: number): ActionResult;
+  order(articleId: string, supplierId: string, qty: number, express: boolean): ActionResult;
   sell(articleId: string, qty: number): ActionResult;
   buyShelf(): ActionResult;
   buildExtension(): ActionResult;
@@ -23,6 +26,11 @@ export interface HudActions {
   cancelJob(jobId: number): ActionResult;
   setMinStock(articleId: string, value: number): void;
   markMessagesRead(): void;
+  expediteOrder(orderId: number): ActionResult;
+  helpOut(): TapResult;
+  hireHelper(): ActionResult;
+  fireHelper(): ActionResult;
+  buyVan(): ActionResult;
 }
 
 interface PanelDef {
@@ -38,7 +46,7 @@ interface PanelDef {
 const PANELS: PanelDef[] = [
   { id: 'trade', icon: '🔁', label: 'Handel', render: renderTrade },
   { id: 'orders', icon: '📋', label: 'Aufträge', render: (state, ui) => renderOrders(state, ui.ordersTab) },
-  { id: 'staff', icon: '👷', label: 'Personal', stage: 4, text: 'Mitarbeiter einstellen, Gehälter, Erfahrung und Motivation.' },
+  { id: 'staff', icon: '👷', label: 'Personal', render: (state) => renderStaff(state) },
   { id: 'storage', icon: '📦', label: 'Lager', render: (state) => renderStorage(state) },
   { id: 'finance', icon: '💶', label: 'Finanzen', stage: 4, text: 'Fixkosten, Kredite und Monatsbilanz.' },
   { id: 'upgrades', icon: '⭐', label: 'Upgrades', stage: 5, text: 'Upgrade-Baum und Firmenlevel.' },
@@ -70,6 +78,13 @@ export class Hud {
   private last = { money: '', level: '', season: '', rep: '', day: '', clock: '', speed: -1, unread: -1, offers: -1 };
   private readonly ui = createPanelUiState();
   private readonly repEl: HTMLElement;
+  private readonly workEl: HTMLElement;
+  private readonly workLabel: HTMLElement;
+  private readonly workTime: HTMLElement;
+  private readonly workBar: HTMLElement;
+  private readonly fab: HTMLButtonElement;
+  private readonly root: HTMLElement;
+  private lastWorkKey = '';
   private readonly bellBadge: HTMLElement;
   private readonly summaryEl: HTMLElement;
   /** Beim Öffnen des Postfachs ungelesene Meldungen merken, um sie hervorzuheben. */
@@ -110,6 +125,11 @@ export class Hud {
         </div>
         <div class="panel-body" data-ref="panelBody"></div>
       </section>
+      <div class="work" data-ref="work" hidden>
+        <div class="work-task"><b data-ref="workLabel"></b><small data-ref="workTime"></small>
+          <span class="prog"><i class="d" data-ref="workBar"></i></span></div>
+        <button class="fab" data-ref="fab" aria-label="Mit anpacken"><span class="fab-icon" aria-hidden="true">💪</span><span>Anpacken</span></button>
+      </div>
       <div class="toast" data-ref="toast" hidden></div>
       <div class="overlay" data-ref="summary" hidden><div class="dialog" role="dialog" aria-modal="true" aria-label="Während du weg warst"></div></div>
     `;
@@ -129,6 +149,13 @@ export class Hud {
     this.summaryEl = ref('summary');
     this.summaryEl.addEventListener('click', this.onPanelClick);
     ref('bell').addEventListener('click', () => this.togglePanel('messages'));
+    this.workEl = ref('work');
+    this.workLabel = ref('workLabel');
+    this.workTime = ref('workTime');
+    this.workBar = ref('workBar');
+    this.fab = ref<HTMLButtonElement>('fab');
+    this.fab.addEventListener('click', this.onTap);
+    this.root = root;
 
     const speedGroup = root.querySelector<HTMLElement>('.speed')!;
     for (const speed of GAME_SPEEDS) {
@@ -211,12 +238,58 @@ export class Hud {
       this.bellBadge.hidden = unread === 0;
       this.bellBadge.textContent = unread > 99 ? '99+' : String(unread);
     }
+    this.updateWork(state);
     if (this.openPanelId && (this.panelDirty || revision !== this.renderedRevision)) {
       this.renderedRevision = revision;
       this.panelDirty = false;
       this.renderPanelBody();
     }
   }
+
+  /** Knopf „Anpacken“ mit Fortschritt: sichtbar, solange verladen oder eingeräumt wird. */
+  private updateWork(state: Readonly<GameState>): void {
+    const loading = state.vans.find((v) => v.phase === 'loading' && v.workLeft > 0);
+    const target = tapTarget(state);
+    let label = '';
+    let work = null as null | { workLeft: number; workTotal: number };
+    if (loading) {
+      const job = state.jobs.find((j) => j.id === loading.jobId);
+      label = `🚚 Verladen ${loading.load}× ${job ? getArticle(job.articleId).name : ''}`;
+      work = loading;
+    } else if (state.storing) {
+      const p = state.inbound.find((x) => x.id === state.storing!.palletId);
+      label = `📦 Einräumen ${p ? `${p.qty}× ${getArticle(p.articleId).name}` : ''}`;
+      work = state.storing;
+    }
+    const capped = !!work && !target;
+    const key = work ? `${label}|${Math.round(work.workLeft)}|${capped}` : '';
+    if (key === this.lastWorkKey) return;
+    this.lastWorkKey = key;
+    this.workEl.hidden = !work;
+    this.root.classList.toggle('has-work', !!work);
+    if (!work) return;
+    this.workLabel.textContent = label;
+    this.workTime.textContent = capped ? 'Mehr Hilfe geht hier nicht (max. 50 %)' : `noch ca. ${Math.ceil(workMinutesLeft(state, work as never))} Min.`;
+    this.workBar.style.width = `${(1 - work.workLeft / work.workTotal) * 100}%`;
+    this.fab.disabled = capped;
+  }
+
+  private onTap = (e: MouseEvent): void => {
+    const result = this.actions.helpOut();
+    if (!result.ok) return;
+    // Kurze Rückmeldung am Knopf: „−3 Min.“
+    const tag = document.createElement('span');
+    tag.className = 'tap-float';
+    tag.textContent = `−${Math.round(result.saved * 10) / 10} Min.`;
+    const rect = this.fab.getBoundingClientRect();
+    tag.style.left = `${(e.clientX || rect.left + rect.width / 2) - 20 + (Math.random() * 30 - 15)}px`;
+    tag.style.top = `${(e.clientY || rect.top) - 20}px`;
+    this.root.append(tag);
+    window.setTimeout(() => tag.remove(), 900);
+    this.fab.classList.remove('pulse');
+    void this.fab.offsetWidth; // Animation neu starten
+    this.fab.classList.add('pulse');
+  };
 
   /** Zusammenfassung nach dem Nachrechnen; bei wenig Zeit ohne Ereignisse nur ein kurzer Hinweis. */
   showSummary(summary: CatchUpSummary): void {
@@ -248,6 +321,7 @@ export class Hud {
     this.openPanelId = next;
     for (const [pid, btn] of this.navButtons) btn.classList.toggle('active', pid === next);
     const def = findPanel(next);
+    this.root?.classList.toggle('panel-open', !!def);
     if (!def) {
       this.panelEl.hidden = true;
       return;
@@ -336,7 +410,7 @@ export class Hud {
         const offer = offers.find((o) => o.supplier.id === ui.buySupplier) ?? offers[0];
         if (!ui.buyArticle || !offer) return;
         const qty = Math.min(ui.buyQty, maxOrderQty(state, ui.buyArticle, offer));
-        this.report(this.actions.order(ui.buyArticle, offer.supplier.id, qty));
+        this.report(this.actions.order(ui.buyArticle, offer.supplier.id, qty, ui.buyExpress));
         break;
       }
       case 'unlock':
@@ -360,6 +434,27 @@ export class Hud {
       }
       case 'shelf':
         this.report(this.actions.buyShelf());
+        break;
+      case 'express':
+        ui.buyExpress = !ui.buyExpress;
+        break;
+      case 'expedite':
+        this.report(this.actions.expediteOrder(Number(id)));
+        break;
+      case 'hire':
+        this.report(this.actions.hireHelper());
+        break;
+      case 'fire':
+        if (el.dataset.confirm !== 'yes') {
+          el.dataset.confirm = 'yes';
+          el.textContent = 'Wirklich?';
+          el.classList.add('danger');
+          return;
+        }
+        this.report(this.actions.fireHelper());
+        break;
+      case 'buyvan':
+        this.report(this.actions.buyVan());
         break;
       case 'otab':
         ui.ordersTab = el.dataset.tab as OrdersTab;
