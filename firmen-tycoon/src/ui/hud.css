@@ -1,0 +1,245 @@
+:root {
+  --ui-bg: rgba(255, 252, 245, 0.94);
+  --ui-border: rgba(80, 60, 40, 0.18);
+  --ui-text: #2f2a24;
+  --ui-muted: #7a6f62;
+  --ui-accent: #e07a2a;
+  --ui-accent-soft: #fde3c8;
+  --ui-time: #ffd88a;
+  --ui-shadow: 0 3px 10px rgba(40, 30, 20, 0.18);
+  --radius: 14px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #bfe0f0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--ui-text);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+}
+
+#app { position: fixed; inset: 0; }
+
+#scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+#hud > * { pointer-events: auto; }
+
+button {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+/* ---------- Statusleiste oben ---------- */
+.topbar {
+  position: absolute;
+  top: calc(8px + var(--safe-top));
+  left: calc(8px + var(--safe-left));
+  right: calc(8px + var(--safe-right));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.topbar > * { pointer-events: auto; }
+.topbar-spacer { flex: 1; pointer-events: none; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  box-shadow: var(--ui-shadow);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.chip-icon { font-size: 1.05em; }
+.chip-time { background: var(--ui-time); }
+.time-sep { color: var(--ui-muted); }
+
+.speed {
+  display: inline-flex;
+  height: 40px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  box-shadow: var(--ui-shadow);
+}
+.speed button {
+  min-width: 42px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.speed button + button { border-left: 1px solid var(--ui-border); }
+.speed button.active { background: var(--ui-accent); color: #fff; }
+
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  box-shadow: var(--ui-shadow);
+  font-size: 1.1rem;
+}
+
+/* ---------- Menü (Speichern / Neues Spiel) ---------- */
+.menu {
+  position: absolute;
+  top: calc(56px + var(--safe-top));
+  right: calc(8px + var(--safe-right));
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  padding: 6px;
+  border-radius: var(--radius);
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  box-shadow: var(--ui-shadow);
+  z-index: 20;
+}
+.menu[hidden] { display: none; }
+.menu button {
+  text-align: left;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.menu button:hover { background: var(--ui-accent-soft); }
+
+/* ---------- Menüleiste unten ---------- */
+.bottombar {
+  position: absolute;
+  left: 50%;
+  bottom: calc(8px + var(--safe-bottom));
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  width: min(640px, calc(100% - 16px - var(--safe-left) - var(--safe-right)));
+  padding: 6px;
+  border-radius: 18px;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  box-shadow: var(--ui-shadow);
+}
+.bottombar button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 52px;
+  padding: 4px 2px;
+  border-radius: 12px;
+}
+.bottombar button:hover { background: var(--ui-accent-soft); }
+.bottombar button.active { background: var(--ui-accent); color: #fff; }
+.nav-icon { font-size: 1.35rem; line-height: 1; }
+.nav-label { font-size: 0.72rem; font-weight: 600; }
+
+/* ---------- Panel ---------- */
+.panel {
+  position: absolute;
+  right: calc(12px + var(--safe-right));
+  top: calc(60px + var(--safe-top));
+  bottom: calc(86px + var(--safe-bottom));
+  width: min(380px, calc(100% - 24px));
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius);
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  box-shadow: 0 8px 30px rgba(40, 30, 20, 0.25);
+  overflow: hidden;
+  z-index: 10;
+}
+.panel[hidden] { display: none; }
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 10px 10px 16px;
+  border-bottom: 1px solid var(--ui-border);
+}
+.panel-head h2 { margin: 0; font-size: 1.1rem; }
+.panel-head .icon-btn { box-shadow: none; }
+.panel-body { padding: 16px; overflow-y: auto; }
+.placeholder { margin: 0 0 12px; line-height: 1.45; }
+.placeholder-note { margin: 0; color: var(--ui-muted); font-style: italic; }
+
+/* ---------- Toast ---------- */
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: calc(96px + var(--safe-bottom));
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(47, 42, 36, 0.9);
+  color: #fff;
+  font-weight: 600;
+  pointer-events: none;
+  z-index: 30;
+}
+.toast[hidden] { display: none; }
+
+/* ---------- Handy ---------- */
+@media (max-width: 600px) {
+  .chip { height: 36px; padding: 0 10px; font-size: 0.9rem; }
+  .speed, .icon-btn { height: 36px; }
+  .icon-btn { width: 36px; }
+  .speed button { min-width: 38px; }
+  /* Zweite Zeile: Zeit + Geschwindigkeit */
+  .topbar-spacer { flex-basis: 100%; height: 0; }
+  .menu { top: calc(96px + var(--safe-top)); }
+  /* Panel als Bottom-Sheet über der Menüleiste */
+  .panel {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    top: auto;
+    max-height: 55%;
+    bottom: calc(80px + var(--safe-bottom));
+  }
+  .bottombar { gap: 2px; padding: 4px; }
+  .bottombar button { min-height: 50px; }
+  .nav-label { font-size: 0.66rem; }
+}
+
+@media (max-width: 360px) {
+  .chip-level .chip-icon { display: none; }
+  .nav-label { font-size: 0.6rem; }
+}
