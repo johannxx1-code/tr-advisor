@@ -27,7 +27,7 @@ const PANELS: PanelDef[] = [
   { id: 'upgrades', icon: '⭐', label: 'Upgrades', stage: 5, text: 'Upgrade-Baum und Firmenlevel.' },
 ];
 
-const SPEED_LABELS: Record<GameSpeed, string> = { 0: '⏸', 1: '1×', 2: '2×', 4: '4×' };
+const SPEED_LABELS: Record<GameSpeed, string> = { 0: '❚❚', 1: '1×', 2: '2×', 4: '4×' };
 
 const money = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 

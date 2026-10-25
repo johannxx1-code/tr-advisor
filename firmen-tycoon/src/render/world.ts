@@ -178,16 +178,14 @@ function buildBuilding(details: THREE.Group): THREE.Group {
   g.add(box(0.04, 2.2, 2.3, PALETTE.wallOffice, 4.17, 1.45, -4.75, false));
   // Aufgerolltes Rolltor über der Lagereinfahrt
   g.add(box(4.2, 0.35, 0.35, PALETTE.door, -1, L + 0.2, 4));
-  // Türrahmen Büro
-  for (const [x, z, rot] of [[6.5, 0, 0], [4, -3, Math.PI / 2]] as const) {
-    const frame = new THREE.Group();
-    frame.add(box(0.12, 2.2, 0.4, PALETTE.doorFrame, -0.56, 1.1, 0));
-    frame.add(box(0.12, 2.2, 0.4, PALETTE.doorFrame, 0.56, 1.1, 0));
-    if (rot !== 0) frame.add(box(1.24, 0.15, 0.4, PALETTE.doorFrame, 0, 2.25, 0));
-    frame.position.set(x, 0, z);
-    frame.rotation.y = rot;
-    g.add(frame);
-  }
+  // Türrahmen zwischen Lager und Büro
+  const frame = new THREE.Group();
+  frame.add(box(0.12, 2.2, 0.4, PALETTE.doorFrame, -0.56, 1.1, 0));
+  frame.add(box(0.12, 2.2, 0.4, PALETTE.doorFrame, 0.56, 1.1, 0));
+  frame.add(box(1.24, 0.15, 0.4, PALETTE.doorFrame, 0, 2.25, 0));
+  frame.position.set(4, 0, -3);
+  frame.rotation.y = Math.PI / 2;
+  g.add(frame);
 
   // Regale im Lager: Reihe an der Rückwand + zwei Doppelreihen
   const rand = mulberry32(42);

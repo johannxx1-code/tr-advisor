@@ -6,7 +6,7 @@ import { PALETTE } from './palette';
 import { buildWorld, type World } from './world';
 
 /** Ab diesem Zoomgrad (0…1) werden Kleinteile im Gebäude eingeblendet. */
-const DETAIL_ZOOM = 0.55;
+const DETAIL_ZOOM = 0.68;
 
 export class GameScene {
   private readonly renderer: THREE.WebGLRenderer;
@@ -20,7 +20,7 @@ export class GameScene {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
 
