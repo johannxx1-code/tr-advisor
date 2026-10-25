@@ -31,6 +31,33 @@ export interface Order {
   /** Wurde die Zuverlässigkeit schon geprüft? (Verspätung nur einmal) */
   rolled: boolean;
   delayed: boolean;
+  /** Express gebucht (kürzere Lieferzeit, zuverlässiger). */
+  express: boolean;
+}
+
+/** Gelieferte Ware im Wareneingang – muss erst eingeräumt werden. */
+export interface InboundPallet {
+  id: number;
+  articleId: string;
+  qty: number;
+  arrivedAt: number;
+}
+
+/**
+ * Arbeit, die Zeit braucht und beschleunigt werden kann (Verladen, Einräumen).
+ * Gemessen in „Arbeitsminuten“: mit Aushilfe doppelt so schnell, Tippen zieht direkt ab.
+ */
+export interface WorkProgress {
+  workTotal: number;
+  workLeft: number;
+  /** Durch Tippen bereits gesparte Arbeitsminuten (max. 50 % von workTotal). */
+  tapSaved: number;
+  /** Bis zu dieser Spielminute ist die Arbeit verbucht. */
+  lastWorkAt: number;
+}
+
+export interface StoreTask extends WorkProgress {
+  palletId: number;
 }
 
 /** Auftragsangebot eines Kunden (noch nicht angenommen). */
@@ -89,7 +116,8 @@ export interface JobResult {
 
 export type VanPhase = 'idle' | 'loading' | 'outbound' | 'unloading' | 'returning';
 
-export interface Van {
+export interface Van extends WorkProgress {
+  id: number;
   phase: VanPhase;
   jobId: number | null;
   load: number;
@@ -97,7 +125,7 @@ export interface Van {
   phaseEnd: number;
 }
 
-export type MessageKind = 'done' | 'stock' | 'blocked' | 'late' | 'delivery' | 'delay' | 'offer' | 'cancelled';
+export type MessageKind = 'done' | 'stock' | 'blocked' | 'late' | 'delivery' | 'delay' | 'offer' | 'cancelled' | 'staff';
 
 export interface GameMessage {
   id: number;
@@ -107,7 +135,7 @@ export interface GameMessage {
   text: string;
   read: boolean;
   /** Wohin ein Tippen auf die Meldung führt. */
-  target?: { panel: 'orders' | 'storage' | 'trade'; articleId?: string };
+  target?: { panel: 'orders' | 'storage' | 'trade' | 'staff'; articleId?: string };
 }
 
 export interface GameState {
@@ -138,7 +166,13 @@ export interface GameState {
   /** Zuletzt abgeschlossene Aufträge (neueste zuerst). */
   completedJobs: JobResult[];
   nextJobId: number;
-  van: Van;
+  vans: Van[];
+  /** Aushilfe eingestellt (Verladen & Einräumen doppelt so schnell). */
+  helper: boolean;
+  inbound: InboundPallet[];
+  /** Palette, die gerade eingeräumt wird. */
+  storing: StoreTask | null;
+  nextPalletId: number;
   messages: GameMessage[];
   nextMessageId: number;
   /** Eigene Mindestmenge je Artikel (0 = keine Warnung). */
@@ -176,12 +210,20 @@ export function createInitialState(seed: number = randomSeed()): GameState {
     jobs: [],
     completedJobs: [],
     nextJobId: 1,
-    van: { phase: 'idle', jobId: null, load: 0, phaseStart: 0, phaseEnd: 0 },
+    vans: [createVan(1)],
+    helper: false,
+    inbound: [],
+    storing: null,
+    nextPalletId: 1,
     messages: [],
     nextMessageId: 1,
     minStock: {},
     stockAlerted: {},
   };
+}
+
+export function createVan(id: number): Van {
+  return { id, phase: 'idle', jobId: null, load: 0, phaseStart: 0, phaseEnd: 0, workTotal: 0, workLeft: 0, tapSaved: 0, lastWorkAt: 0 };
 }
 
 export function companyLevelName(level: number): string {

@@ -138,12 +138,23 @@ describe('Spielstand-Migration', () => {
     expect(s.shelves).toBe(2);
     expect(s.reputation).toBe(50);
     expect(s.jobs).toEqual([]);
+    expect(s.vans).toHaveLength(1);
   });
 
-  it('aktueller Spielstand (v3) bleibt beim Laden unverändert', () => {
+  it('v3-Spielstand: einzelner Wagen wird zur Wagenliste', () => {
+    const v3 = { ...createInitialState(SEED), van: { phase: 'outbound', jobId: 5, load: 40, phaseStart: 100, phaseEnd: 200 } } as Record<string, unknown>;
+    delete v3.vans;
+    const s = migrate(3, v3);
+    expect(s.vans).toHaveLength(1);
+    expect(s.vans[0].phase).toBe('outbound');
+    expect(s.vans[0].jobId).toBe(5);
+    expect(s.helper).toBe(false);
+  });
+
+  it('aktueller Spielstand (v4) bleibt beim Laden unverändert', () => {
     const sim = newSim();
     sim.unlockArticle('led');
-    const copy = migrate(3, JSON.parse(JSON.stringify(sim.state)));
+    const copy = migrate(4, JSON.parse(JSON.stringify(sim.state)));
     expect(copy).toEqual(sim.state);
   });
 });

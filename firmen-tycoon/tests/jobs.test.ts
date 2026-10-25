@@ -31,8 +31,8 @@ describe('Aufträge und Touren', () => {
     const { sim, state } = setup({ qty: 100 });
     const money = state.money;
     expect(sim.acceptOffer(999).ok).toBe(true);
-    expect(state.van.phase).toBe('loading'); // 08:00 = Betriebszeit
-    expect(state.van.load).toBe(VAN_SLOTS);
+    expect(state.vans[0].phase).toBe('loading'); // 08:00 = Betriebszeit
+    expect(state.vans[0].load).toBe(VAN_SLOTS);
     expect(state.inventory.akkuschrauber).toBe(160);
 
     const messages: string[] = [];
@@ -45,17 +45,17 @@ describe('Aufträge und Touren', () => {
     expect(state.money).toBeCloseTo(money + 100 * 100 + 1000, 2); // Erlös + 10 % Bonus
     expect(state.reputation).toBe(54);
     expect(messages).toContain('done');
-    expect(state.van.phase).toBe('idle');
+    expect(state.vans[0].phase).toBe('idle');
   });
 
   it('Touren starten nur in der Betriebszeit', () => {
     const { sim, state } = setup({ qty: 200, stock: 300, distance: 240 });
     sim.acceptOffer(999);
     for (let i = 0; i < 3 * 24 * 12; i++) {
-      const before = state.van.phase;
+      const before = state.vans[0].phase;
       sim.advanceMinutes(5);
-      if (before === 'idle' && state.van.phase === 'loading') {
-        const h = hourOf(state.van.phaseStart);
+      if (before === 'idle' && state.vans[0].phase === 'loading') {
+        const h = hourOf(state.vans[0].phaseStart);
         expect(h).toBeGreaterThanOrEqual(OPEN_HOUR);
         expect(h).toBeLessThan(CLOSE_HOUR);
       }

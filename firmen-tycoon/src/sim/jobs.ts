@@ -7,17 +7,14 @@ import { marketPrice } from './market';
 import { addMessage } from './messages';
 import { nextRandom, round2 } from './random';
 import { capacity } from './storage';
-import type { GameState, Job, JobOffer, JobResult } from './state';
+import type { GameState, Job, JobOffer, JobResult, Van } from './state';
 import type { ActionResult } from './trade';
+import { CLOSE_HOUR, LOAD_BASE_MIN, LOAD_PER_UNIT_MIN, loadWork, OPEN_HOUR, workRate } from './work';
 
 /** Lagerplätze pro Tour im Firmenwagen. */
 export const VAN_SLOTS = 40;
-export const LOAD_BASE_MIN = 60;
-export const LOAD_PER_UNIT_MIN = 3;
 export const UNLOAD_MIN = 30;
-/** Touren starten nur in der Betriebszeit (Stunde, inklusive … exklusive). */
-export const OPEN_HOUR = 6;
-export const CLOSE_HOUR = 18;
+export { CLOSE_HOUR, LOAD_BASE_MIN, LOAD_PER_UNIT_MIN, OPEN_HOUR } from './work';
 export const MAX_ACTIVE_JOBS = 3;
 export const BONUS_RATE = 0.1;
 export const LATE_RATE_PER_DAY = 0.05;
@@ -175,36 +172,56 @@ function changeReputation(state: GameState, delta: number): void {
 
 export interface TourEvent {
   type: 'loading' | 'outbound' | 'unloaded' | 'returned';
+  vanId: number;
   jobId: number | null;
 }
 
-/** Fortschritt bis zur aktuellen Spielminute. Gibt Tour-Ereignisse zurück (für Animation/Hinweise). */
+/** Fortschritt aller Wagen bis zur aktuellen Spielminute. Gibt Tour-Ereignisse zurück (für Animation/Hinweise). */
 export function updateJobs(state: GameState): TourEvent[] {
   const events: TourEvent[] = [];
+  for (const van of state.vans) updateVan(state, van, events);
+  checkStock(state);
+  return events;
+}
+
+function updateVan(state: GameState, van: Van, events: TourEvent[]): void {
   const now = state.minutes;
-  const van = state.van;
+  const rate = workRate(state);
   // Mehrere Phasenwechsel in einem Schritt möglich (z. B. beim Nachrechnen)
   for (let guard = 0; guard < 8; guard++) {
     if (van.phase === 'idle') {
-      if (!startTour(state)) break;
-      events.push({ type: 'loading', jobId: van.jobId });
+      if (!startTour(state, van)) return;
+      events.push({ type: 'loading', vanId: van.id, jobId: van.jobId });
       continue;
     }
-    if (now < van.phaseEnd) break;
+    if (van.phase === 'loading') {
+      // Verladen ist Arbeit: Aushilfe und Tippen beschleunigen es
+      const done = (now - van.lastWorkAt) * rate;
+      if (done + 1e-9 < van.workLeft) {
+        van.workLeft -= done;
+        van.lastWorkAt = now;
+        van.phaseEnd = now + van.workLeft / rate; // voraussichtliches Ende für die Anzeige
+        return;
+      }
+      van.phaseEnd = van.lastWorkAt + van.workLeft / rate;
+      van.workLeft = 0;
+    } else if (now < van.phaseEnd) {
+      return;
+    }
     const job = state.jobs.find((j) => j.id === van.jobId);
     const t = van.phaseEnd;
     switch (van.phase) {
       case 'loading':
-        setPhase(state, 'outbound', t, job?.distance ?? 60);
-        events.push({ type: 'outbound', jobId: van.jobId });
+        setPhase(van, 'outbound', t, job?.distance ?? 60);
+        events.push({ type: 'outbound', vanId: van.id, jobId: van.jobId });
         break;
       case 'outbound':
-        setPhase(state, 'unloading', t, UNLOAD_MIN);
+        setPhase(van, 'unloading', t, UNLOAD_MIN);
         break;
       case 'unloading':
         if (job) deliverLoad(state, job, van.load);
-        events.push({ type: 'unloaded', jobId: van.jobId });
-        setPhase(state, 'returning', t, job?.distance ?? 60);
+        events.push({ type: 'unloaded', vanId: van.id, jobId: van.jobId });
+        setPhase(van, 'returning', t, job?.distance ?? 60);
         break;
       case 'returning':
         van.phase = 'idle';
@@ -212,22 +229,20 @@ export function updateJobs(state: GameState): TourEvent[] {
         van.load = 0;
         van.phaseStart = t;
         van.phaseEnd = t;
-        events.push({ type: 'returned', jobId: null });
+        events.push({ type: 'returned', vanId: van.id, jobId: null });
         break;
     }
   }
-  checkStock(state);
-  return events;
 }
 
-function setPhase(state: GameState, phase: Exclude<GameState['van']['phase'], 'idle'>, start: number, duration: number): void {
-  state.van.phase = phase;
-  state.van.phaseStart = start;
-  state.van.phaseEnd = start + duration;
+function setPhase(van: Van, phase: Exclude<Van['phase'], 'idle'>, start: number, duration: number): void {
+  van.phase = phase;
+  van.phaseStart = start;
+  van.phaseEnd = start + duration;
 }
 
 /** Nächste Tour starten, wenn Betriebszeit ist und ein Auftrag genug Bestand für eine Tour hat. */
-function startTour(state: GameState): boolean {
+function startTour(state: GameState, van: Van): boolean {
   const hour = hourOf(state.minutes);
   if (hour < OPEN_HOUR || hour >= CLOSE_HOUR) return false;
   const open = state.jobs.filter((j) => !j.cancelled && remainingToLoad(j) > 0).sort((a, b) => a.deadline - b.deadline);
@@ -235,7 +250,9 @@ function startTour(state: GameState): boolean {
     const need = Math.min(remainingToLoad(job), unitsPerTour(job.articleId));
     const stock = state.inventory[job.articleId] ?? 0;
     if (stock < need) {
-      if (!job.blockedNotified) {
+      // Nur melden, wenn gerade kein Wagen für diesen Auftrag unterwegs ist
+      const served = state.vans.some((v) => v.phase !== 'idle' && v.jobId === job.id);
+      if (!served && !job.blockedNotified) {
         job.blockedNotified = true;
         addMessage(state, {
           kind: 'blocked',
@@ -250,9 +267,14 @@ function startTour(state: GameState): boolean {
     state.inventory[job.articleId] = stock - need;
     if (state.inventory[job.articleId] === 0) delete state.inventory[job.articleId];
     job.inTransit += need;
-    state.van.jobId = job.id;
-    state.van.load = need;
-    setPhase(state, 'loading', state.minutes, LOAD_BASE_MIN + LOAD_PER_UNIT_MIN * need);
+    const work = loadWork(need);
+    van.jobId = job.id;
+    van.load = need;
+    van.workTotal = work;
+    van.workLeft = work;
+    van.tapSaved = 0;
+    van.lastWorkAt = state.minutes;
+    setPhase(van, 'loading', state.minutes, work / workRate(state));
     return true;
   }
   return false;

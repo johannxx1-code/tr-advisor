@@ -1,9 +1,9 @@
 // Speichern/Laden im Browser (localStorage) mit versioniertem Spielstand.
 
-import { createInitialState, GAME_SPEEDS, type GameState } from '../sim/state';
+import { createInitialState, createVan, GAME_SPEEDS, type GameState, type Van } from '../sim/state';
 
 /** Bei jeder inkompatiblen Änderung an GameState erhöhen und migrate() ergänzen. */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 const STORAGE_KEY = 'firmen-tycoon.save';
 
 interface SaveFile {
@@ -80,7 +80,7 @@ export function migrate(version: number, state: unknown): GameState {
     unlocked: hasTrade && Array.isArray(s.unlocked) ? s.unlocked.filter((id) => typeof id === 'string') : d.unlocked,
     inventory: hasTrade && s.inventory && typeof s.inventory === 'object' ? { ...s.inventory } : d.inventory,
     market,
-    orders: hasTrade && Array.isArray(s.orders) ? s.orders : d.orders,
+    orders: hasTrade && Array.isArray(s.orders) ? s.orders.map((o) => ({ ...o, express: o.express ?? false })) : d.orders,
     nextOrderId: hasTrade ? num(s.nextOrderId, d.nextOrderId) : d.nextOrderId,
     shelves: hasTrade ? num(s.shelves, d.shelves) : d.shelves,
     extension: hasTrade ? num(s.extension, d.extension) : d.extension,
@@ -90,10 +90,34 @@ export function migrate(version: number, state: unknown): GameState {
     jobs: hasJobs && Array.isArray(s.jobs) ? s.jobs : d.jobs,
     completedJobs: hasJobs && Array.isArray(s.completedJobs) ? s.completedJobs : d.completedJobs,
     nextJobId: hasJobs ? num(s.nextJobId, d.nextJobId) : d.nextJobId,
-    van: hasJobs && s.van && typeof s.van === 'object' ? { ...d.van, ...s.van } : d.van,
+    // v3 → v4: ein Wagen wird zur Wagenliste; Aushilfe, Wareneingang, Express
+    vans: migrateVans(version, s),
+    helper: version >= 4 && typeof s.helper === 'boolean' ? s.helper : d.helper,
+    inbound: version >= 4 && Array.isArray(s.inbound) ? s.inbound : d.inbound,
+    storing: version >= 4 && s.storing && typeof s.storing === 'object' ? s.storing : d.storing,
+    nextPalletId: version >= 4 ? num(s.nextPalletId, d.nextPalletId) : d.nextPalletId,
     messages: hasJobs && Array.isArray(s.messages) ? s.messages : d.messages,
     nextMessageId: hasJobs ? num(s.nextMessageId, d.nextMessageId) : d.nextMessageId,
     minStock: hasJobs && s.minStock && typeof s.minStock === 'object' ? { ...s.minStock } : d.minStock,
     stockAlerted: hasJobs && s.stockAlerted && typeof s.stockAlerted === 'object' ? { ...s.stockAlerted } : d.stockAlerted,
   };
+}
+
+function migrateVans(version: number, s: Partial<GameState> & { van?: Partial<Van> }): Van[] {
+  if (version >= 4 && Array.isArray(s.vans) && s.vans.length) return s.vans.map((v) => ({ ...createVan(v.id ?? 1), ...v }));
+  if (version === 3 && s.van && typeof s.van === 'object') {
+    const v = { ...createVan(1), ...s.van, id: 1 };
+    // Laufendes Verladen (v3 zeitbasiert) in Arbeit umrechnen
+    if (v.phase === 'loading') {
+      v.workLeft = Math.max(0, v.phaseEnd - num0(s.minutes));
+      v.workTotal = Math.max(v.workLeft, v.phaseEnd - v.phaseStart);
+      v.lastWorkAt = num0(s.minutes);
+    }
+    return [v];
+  }
+  return [createVan(1)];
+}
+
+function num0(v: unknown): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v : 0;
 }

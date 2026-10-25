@@ -48,7 +48,20 @@ export function unlockArticle(state: GameState, articleId: string): ActionResult
   return { ok: true, message: `${article.name} freigeschaltet` };
 }
 
-export function placeOrder(state: GameState, articleId: string, supplierId: string, qty: number): ActionResult {
+/** Express: halbe Lieferzeit (mind. 1 Tag), +5 % Zuverlässigkeit, Aufpreis 25 % vom Warenwert (mind. 30 €). */
+export const EXPRESS_RATE = 0.25;
+export const EXPRESS_MIN_FEE = 30;
+export const EXPRESS_RELIABILITY_BONUS = 0.05;
+
+export function expressFee(goodsValue: number): number {
+  return round2(Math.max(EXPRESS_MIN_FEE, goodsValue * EXPRESS_RATE));
+}
+
+export function expressLeadDays(leadDays: number): number {
+  return Math.max(1, Math.ceil(leadDays / 2));
+}
+
+export function placeOrder(state: GameState, articleId: string, supplierId: string, qty: number, express = false): ActionResult {
   const article = getArticle(articleId);
   const supplier = getSupplier(supplierId);
   if (!Number.isInteger(qty) || qty <= 0) return fail('Ungültige Menge.');
@@ -56,10 +69,12 @@ export function placeOrder(state: GameState, articleId: string, supplierId: stri
   const offer = supplierOffers(state, articleId).find((o) => o.supplier.id === supplierId);
   if (!offer) return fail(`${supplier.name} führt diesen Artikel gerade nicht.`);
   if (qty * article.slots > freeSlots(state)) return fail('Nicht genug Lagerplatz – Regal kaufen oder erst verkaufen.');
-  const total = orderTotal(offer.unitPrice, qty, supplier);
+  const fee = express ? expressFee(offer.unitPrice * qty) : 0;
+  const total = round2(orderTotal(offer.unitPrice, qty, supplier) + fee);
   if (total > state.money) return fail(`Zu wenig Geld (${euro(total)} nötig).`);
 
   const day = dayOf(state.minutes);
+  const lead = express ? expressLeadDays(supplier.leadDays) : supplier.leadDays;
   state.money = round2(state.money - total);
   state.orders.push({
     id: state.nextOrderId++,
@@ -68,11 +83,28 @@ export function placeOrder(state: GameState, articleId: string, supplierId: stri
     qty,
     unitPrice: offer.unitPrice,
     orderedDay: day,
-    dueDay: day + supplier.leadDays,
+    dueDay: day + lead,
     rolled: false,
     delayed: false,
+    express,
   });
-  return { ok: true, message: `${qty}× ${article.name} bestellt – Ankunft Tag ${day + supplier.leadDays}` };
+  return { ok: true, message: `${qty}× ${article.name} bestellt${express ? ' (Express)' : ''} – Ankunft Tag ${day + lead}` };
+}
+
+/** Nachträglich Express für eine Bestellung unterwegs: Restzeit halbiert (mind. 1 Tag). */
+export function expediteOrder(state: GameState, orderId: number): ActionResult {
+  const order = state.orders.find((o) => o.id === orderId);
+  if (!order) return fail('Bestellung nicht gefunden.');
+  if (order.express) return fail('Ist schon als Express unterwegs.');
+  const today = dayOf(state.minutes);
+  const daysLeft = order.dueDay - today;
+  if (daysLeft < 2) return fail('Kommt sowieso spätestens morgen.');
+  const fee = expressFee(order.unitPrice * order.qty);
+  if (state.money < fee) return fail(`Zu wenig Geld (${euro(fee)} nötig).`);
+  state.money = round2(state.money - fee);
+  order.express = true;
+  order.dueDay = today + expressLeadDays(daysLeft);
+  return { ok: true, message: `Express gebucht – Ankunft jetzt Tag ${order.dueDay}` };
 }
 
 export function sell(state: GameState, articleId: string, qty: number): ActionResult {
@@ -129,7 +161,7 @@ export function processOrders(state: GameState, day: number): DeliveryReport[] {
     let delivered = order.qty;
     if (!order.rolled) {
       order.rolled = true;
-      const reliability = getSupplier(order.supplierId).reliability;
+      const reliability = getSupplier(order.supplierId).reliability + (order.express ? EXPRESS_RELIABILITY_BONUS : 0);
       if (nextRandom(state) >= reliability) {
         if (nextRandom(state) < 0.5) {
           order.delayed = true;
@@ -143,7 +175,8 @@ export function processOrders(state: GameState, day: number): DeliveryReport[] {
     }
     const refund = round2((order.qty - delivered) * order.unitPrice);
     state.money = round2(state.money + refund);
-    state.inventory[order.articleId] = (state.inventory[order.articleId] ?? 0) + delivered;
+    // Ware kommt in den Wareneingang und muss erst eingeräumt werden
+    state.inbound.push({ id: state.nextPalletId++, articleId: order.articleId, qty: delivered, arrivedAt: state.minutes });
     reports.push({ order, delivered, refund });
   }
   state.orders = remaining;

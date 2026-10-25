@@ -7,6 +7,7 @@ import { updateMarketDaily } from './market';
 import { addMessage, markAllRead } from './messages';
 import { createInitialState, type GameMessage, type GameSpeed, type GameState } from './state';
 import * as trade from './trade';
+import * as work from './work';
 
 export interface SimEvents {
   dayChanged: { day: number };
@@ -15,8 +16,10 @@ export interface SimEvents {
   delivery: trade.DeliveryReport;
   /** Neue Meldung im Postfach. */
   message: GameMessage;
-  /** Phasenwechsel des Firmenwagens. */
+  /** Phasenwechsel eines Firmenwagens. */
   tour: jobs.TourEvent;
+  /** Palette fertig eingeräumt. */
+  stored: work.StoredEvent;
 }
 
 /** Größter Simulationsschritt in Spielminuten (Touren werden minutengenau abgearbeitet). */
@@ -73,18 +76,22 @@ export class Simulation {
     while (remaining > 0) {
       const step = Math.min(remaining, MAX_STEP_MINUTES);
       remaining -= step;
+      // Meldungen aus Tageswechsel und Touren gemeinsam weitermelden
+      const lastId = this._state.nextMessageId;
       const before = dayOf(this._state.minutes);
       this._state.minutes += step;
       const after = dayOf(this._state.minutes);
       // Jeder übersprungene Tag wird einzeln verarbeitet, damit Tageslogik nichts verpasst.
       for (let day = before + 1; day <= after; day++) this.startDay(day);
-      this.runJobs();
+      if (this.progress()) this._revision++;
+      this.flushMessages(lastId);
     }
   }
 
   private startDay(day: number): void {
     const state = this._state;
     updateMarketDaily(state);
+    work.payDailyCosts(state);
     for (const report of trade.processOrders(state, day)) {
       const name = getArticle(report.order.articleId).name;
       if (report.delayedUntil !== undefined) {
@@ -102,13 +109,13 @@ export class Simulation {
     this.emit('dayChanged', { day });
   }
 
-  /** Touren und Bestandswarnungen bis zur aktuellen Minute; neue Meldungen weitermelden. */
-  private runJobs(): void {
-    const lastId = this._state.nextMessageId;
-    const events = jobs.updateJobs(this._state);
-    for (const e of events) this.emit('tour', e);
-    if (events.length) this._revision++;
-    this.flushMessages(lastId);
+  /** Einräumen und Touren bis jetzt fortschreiben; true, wenn etwas passiert ist. */
+  private progress(): boolean {
+    const stored = work.updateStoring(this._state);
+    for (const e of stored) this.emit('stored', e);
+    const tours = jobs.updateJobs(this._state);
+    for (const e of tours) this.emit('tour', e);
+    return stored.length > 0 || tours.length > 0;
   }
 
   private flushMessages(sinceId: number): void {
@@ -137,8 +144,36 @@ export class Simulation {
     return this.act(() => trade.unlockArticle(this._state, articleId));
   }
 
-  placeOrder(articleId: string, supplierId: string, qty: number): trade.ActionResult {
-    return this.act(() => trade.placeOrder(this._state, articleId, supplierId, qty));
+  placeOrder(articleId: string, supplierId: string, qty: number, express = false): trade.ActionResult {
+    return this.act(() => trade.placeOrder(this._state, articleId, supplierId, qty, express));
+  }
+
+  expediteOrder(orderId: number): trade.ActionResult {
+    return this.act(() => trade.expediteOrder(this._state, orderId));
+  }
+
+  /** „Mit anpacken“: ein Tipp beim Verladen oder Einräumen. */
+  helpOut(): work.TapResult {
+    const lastId = this._state.nextMessageId;
+    const result = work.helpOut(this._state);
+    if (result.ok) {
+      this._revision++;
+      this.progress();
+    }
+    this.flushMessages(lastId);
+    return result;
+  }
+
+  hireHelper(): trade.ActionResult {
+    return this.act(() => work.hireHelper(this._state));
+  }
+
+  fireHelper(): trade.ActionResult {
+    return this.act(() => work.fireHelper(this._state));
+  }
+
+  buyVan(): trade.ActionResult {
+    return this.act(() => work.buyVan(this._state));
   }
 
   sell(articleId: string, qty: number): trade.ActionResult {
@@ -183,7 +218,7 @@ export class Simulation {
     const result = fn();
     if (result.ok) {
       this._revision++;
-      for (const e of jobs.updateJobs(this._state)) this.emit('tour', e);
+      this.progress();
     }
     this.flushMessages(lastId);
     return result;

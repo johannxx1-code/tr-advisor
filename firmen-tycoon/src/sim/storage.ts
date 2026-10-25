@@ -39,6 +39,11 @@ export function incomingSlots(state: Readonly<GameState>): number {
   return state.orders.reduce((sum, o) => sum + o.qty * getArticle(o.articleId).slots, 0);
 }
 
+/** Plätze, die Ware im Wareneingang belegt (noch nicht eingeräumt). */
+export function inboundSlots(state: Readonly<GameState>): number {
+  return state.inbound.reduce((sum, p) => sum + p.qty * getArticle(p.articleId).slots, 0);
+}
+
 export function freeSlots(state: Readonly<GameState>): number {
-  return capacity(state) - usedSlots(state) - incomingSlots(state);
+  return capacity(state) - usedSlots(state) - inboundSlots(state) - incomingSlots(state);
 }
