@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { BuildingView } from './building';
 import { CameraController } from './cameraController';
+import { CompanyVan, type VanView } from './companyVan';
 import { DeliveryTruck } from './delivery';
 import { PALETTE } from './palette';
 import { buildWorld, type World } from './world';
@@ -15,6 +16,9 @@ export interface SceneView {
   extension: number;
   shelves: number;
   usedSlots: number;
+  /** Aktuelle Spielminute (für den Firmenwagen). */
+  minutes: number;
+  van: VanView;
 }
 
 export class GameScene {
@@ -24,6 +28,7 @@ export class GameScene {
   private readonly world: World;
   private readonly building = new BuildingView();
   private readonly truck = new DeliveryTruck();
+  private readonly companyVan = new CompanyVan();
   readonly controls: CameraController;
   private needsRender = true;
 
@@ -59,7 +64,7 @@ export class GameScene {
     this.scene.add(sun);
 
     this.world = buildWorld();
-    this.scene.add(this.world.root, this.building.root, this.truck.object);
+    this.scene.add(this.world.root, this.building.root, this.truck.object, this.companyVan.object);
 
     this.controls = new CameraController(this.camera, canvas, this.world.bounds);
     this.resize();
@@ -84,9 +89,10 @@ export class GameScene {
       this.building.details.visible = this.controls.zoomLevel >= DETAIL_ZOOM;
       this.needsRender = true;
     }
+    if (this.companyVan.update(view.van, view.minutes)) this.needsRender = true;
   }
 
-  /** Lieferwagen fährt vor. */
+  /** Lieferanten-Lkw fährt vor. */
   playDelivery(): void {
     this.truck.deliver();
   }

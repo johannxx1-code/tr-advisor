@@ -332,3 +332,63 @@ button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px;
   .chip-level .chip-icon { display: none; }
   .nav-label { font-size: 0.6rem; }
 }
+
+/* ---------- Stufe 3: Ruf, Glocke, Aufträge, Meldungen ---------- */
+.bell, .bottombar button { position: relative; }
+.bell .badge, .bottombar .badge {
+  position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px;
+  border-radius: 999px; background: var(--bad); color: #fff; font-size: 0.72rem; font-weight: 800;
+  display: inline-flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums;
+}
+.bell .badge[hidden] { display: none; }
+.bottombar .badge { top: 2px; right: 6px; background: var(--ui-accent); }
+.bottombar button.active .badge { background: #fff; color: var(--ui-accent); }
+.rep-line { margin: 0; font-size: 0.9rem; }
+
+.card { background: var(--row); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.card.warn { outline: 2px solid var(--warn); }
+.card-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.card-top b:first-child { overflow-wrap: break-word; min-width: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 0.82rem; color: var(--ui-muted); font-variant-numeric: tabular-nums; }
+.card-acts { display: flex; gap: 6px; }
+.card-acts .btn { flex: 1; }
+.btn.ghost { background: var(--free); color: var(--ui-text); }
+.btn.danger { background: var(--bad); color: #fff; }
+
+.prog { display: flex; height: 10px; border-radius: 5px; background: var(--free); overflow: hidden; }
+.prog i { display: block; height: 100%; }
+.prog .d { background: var(--ok); }
+.prog .t { background: var(--used); }
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; font-size: 0.72rem; font-weight: 700; }
+.steps span { text-align: center; padding: 4px 2px; border-radius: 6px; background: var(--free); color: var(--ui-muted); }
+.steps span.done { background: var(--ok); color: #fff; }
+.steps span.on { background: var(--ui-accent); color: #fff; }
+.alert { display: flex; align-items: center; gap: 8px; justify-content: space-between; padding: 8px; border-radius: 8px; background: #fdf0d2; font-size: 0.86rem; font-weight: 600; }
+
+.msg { align-items: flex-start; }
+.msg.new { background: var(--ui-accent-soft); }
+.msg-icon { font-size: 1.2rem; line-height: 1.3; }
+
+.stock-row.low { outline: 2px solid var(--warn); }
+.need { color: var(--ui-accent); font-weight: 700; }
+.minstock { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.minstock small { font-size: 0.7rem; color: var(--ui-muted); }
+.minstock-ctrl { display: inline-flex; align-items: center; gap: 2px; }
+.minstock-ctrl button { width: 36px; height: 36px; border-radius: 8px; background: var(--free); font-weight: 800; font-size: 1.1rem; }
+.minstock-ctrl output { min-width: 34px; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+.overlay { position: absolute; inset: 0; background: rgba(30, 24, 18, 0.45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 40; }
+.overlay[hidden] { display: none; }
+.dialog {
+  width: min(440px, 100%); max-height: calc(100% - 32px); overflow-y: auto;
+  background: var(--ui-bg); border-radius: var(--radius); padding: 18px; display: flex; flex-direction: column; gap: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.dialog h2 { margin: 0; font-size: 1.2rem; }
+
+@media (max-width: 600px) {
+  /* Hinweise oben unter der Statusleiste, damit sie keine Panel-Inhalte verdecken */
+  .toast { bottom: auto; top: calc(100px + var(--safe-top)); }
+  .speed button { min-width: 34px; }
+  .chip { padding: 0 8px; }
+}

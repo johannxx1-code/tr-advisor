@@ -2,7 +2,7 @@
 
 import { deleteSave, loadGame, saveGame } from './persistence/save';
 import { GameScene } from './render/scene';
-import { getArticle } from './sim/catalog';
+import { offlineMinutes } from './sim/clock';
 import { Simulation } from './sim/simulation';
 import { createInitialState } from './sim/state';
 import { usedSlots } from './sim/storage';
@@ -35,34 +35,80 @@ const hud = new Hud(document.querySelector<HTMLElement>('#hud')!, {
   sell: (articleId, qty) => sim.sell(articleId, qty),
   buyShelf: () => sim.buyShelf(),
   buildExtension: () => sim.buildExtension(),
+  acceptOffer: (id) => sim.acceptOffer(id),
+  declineOffer: (id) => sim.declineOffer(id),
+  cancelJob: (id) => sim.cancelJob(id),
+  setMinStock: (articleId, value) => sim.setMinStock(articleId, value),
+  markMessagesRead: () => sim.markMessagesRead(),
 });
 
-const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
-sim.on('delivery', ({ order, delivered, refund, delayedUntil }) => {
-  const name = getArticle(order.articleId).name;
-  if (delayedUntil !== undefined) {
-    hud.toast(`Verspätung: ${order.qty}× ${name} kommt erst an Tag ${delayedUntil}`, true);
-    return;
-  }
-  scene.playDelivery();
-  if (delivered < order.qty) {
-    hud.toast(`Teillieferung: ${delivered} von ${order.qty}× ${name} – ${euro.format(refund)} erstattet`, true);
-  } else {
-    hud.toast(`Lieferung eingetroffen: ${delivered}× ${name}`);
-  }
+/** Während des Nachrechnens keine Einzel-Hinweise, sondern am Ende eine Zusammenfassung. */
+let catchingUp = false;
+
+sim.on('delivery', ({ delivered }) => {
+  if (!catchingUp && delivered > 0) scene.playDelivery();
 });
+
+// Meldungen zusätzlich kurz einblenden (außer beim Nachrechnen – dann kommt die Zusammenfassung).
+sim.on('message', (m) => {
+  if (catchingUp) return;
+  hud.toast(m.title, m.kind === 'blocked' || m.kind === 'late' || m.kind === 'stock' || m.kind === 'delay');
+});
+
+/**
+ * Verpasste Zeit nachrechnen (Spiel war zu oder Tab verdeckt) – in Echtzeit, nicht in Spielgeschwindigkeit.
+ * Bei Pause wird nichts nachgerechnet.
+ */
+function catchUp(realMs: number): void {
+  if (sim.state.speed === 0) return;
+  const minutes = offlineMinutes(realMs);
+  if (minutes < 1) return;
+  const firstNewId = sim.state.nextMessageId;
+  const firstOfferId = sim.state.nextJobId;
+  const moneyBefore = sim.state.money;
+  const repBefore = sim.state.reputation;
+  catchingUp = true;
+  try {
+    sim.advanceMinutes(minutes);
+  } finally {
+    catchingUp = false;
+  }
+  const news = sim.state.messages.filter((m) => m.id >= firstNewId);
+  const offers = sim.state.offers.filter((o) => o.id >= firstOfferId).length;
+  hud.showSummary({
+    minutes,
+    messages: news,
+    newOffers: offers,
+    moneyDelta: sim.state.money - moneyBefore,
+    reputationDelta: sim.state.reputation - repBefore,
+  });
+  save();
+}
 
 sim.on('dayChanged', ({ day }) => {
   if ((day - 1) % AUTOSAVE_EVERY_DAYS === 0) save();
 });
 
-// Beim Schließen / Wegwechseln speichern (pagehide ist auf Mobilgeräten zuverlässiger als beforeunload)
+// Beim Schließen / Wegwechseln speichern (pagehide ist auf Mobilgeräten zuverlässiger als beforeunload).
+// Kommt der Tab zurück, wird die verdeckte Zeit in Echtzeit nachgerechnet.
+let hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') save();
+  if (document.visibilityState === 'hidden') {
+    hiddenAt = Date.now();
+    save();
+  } else if (hiddenAt) {
+    catchUp(Date.now() - hiddenAt);
+    hiddenAt = 0;
+    lastTime = performance.now();
+  }
 });
 window.addEventListener('pagehide', save);
 
-if (loaded) hud.toast('Spielstand geladen');
+if (loaded) {
+  const away = Date.now() - loaded.savedAt;
+  if (offlineMinutes(away) >= 1 && sim.state.speed !== 0) catchUp(away);
+  else hud.toast('Spielstand geladen');
+}
 
 let lastTime = performance.now();
 function frame(now: number): void {
@@ -71,7 +117,10 @@ function frame(now: number): void {
   sim.tick(dt);
   const state = sim.state;
   hud.update(state, sim.revision);
-  scene.sync({ extension: state.extension, shelves: state.shelves, usedSlots: usedSlots(state) });
+  scene.sync({
+    extension: state.extension, shelves: state.shelves, usedSlots: usedSlots(state),
+    minutes: state.minutes, van: state.van,
+  });
   scene.render(dt);
   requestAnimationFrame(frame);
 }

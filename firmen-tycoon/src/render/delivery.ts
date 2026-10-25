@@ -1,6 +1,7 @@
-// Lieferwagen-Animation: fährt bei einer Lieferung von der Straße vors Lagertor und wieder weg.
+// Lieferanten-Lkw (blau): fährt bei einer Lieferung von der Straße vors Lagertor und wieder weg. Echtzeit-Animation.
 
 import * as THREE from 'three';
+import { PALETTE } from './palette';
 import { buildVan } from './world';
 
 /** Fahrweg in Weltkoordinaten (x, z): Straße → Zufahrt → vor das Lagertor. */
@@ -19,7 +20,7 @@ export class DeliveryTruck {
   private queued = 0;
 
   constructor() {
-    this.object = buildVan();
+    this.object = buildVan(PALETTE.supplierAccent);
     this.object.scale.setScalar(1.05);
     this.object.visible = false;
   }

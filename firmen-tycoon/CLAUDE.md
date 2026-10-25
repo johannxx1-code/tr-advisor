@@ -30,7 +30,7 @@ Stack: **Vite + TypeScript + Three.js**, keine weiteren Frameworks. Sprache im S
 
 1. Grundgerüst (Szene, Kamera, Spielzeit, HUD, Speichern/Laden, responsiv) ✅
 2. Handel (Einkauf/Verkauf, Lieferanten, Marktpreise, einfacher Lagerausbau) ✅
-3. Aufträge & Ruf
+3. Aufträge & Ruf (Touren im Hintergrund, Meldungen, Nachrechnen) ✅
 4. Personal & Finanzen
 5. Großer Lagerausbau (Umzug Halle …) & Level/Upgrades
 6. Produktion
@@ -46,6 +46,19 @@ Stack: **Vite + TypeScript + Three.js**, keine weiteren Frameworks. Sprache im S
 - Lager: Regal = 20 Plätze; erst alle Regalplätze im Gebäude füllen, dann Anbau 1 (+6) bzw. Anbau 2 (+8). In 3D sichtbar, Ware füllt die Regale der Reihe nach.
 - UI: Panel „Handel“ mit Reitern Einkauf / Verkauf / Unterwegs; Panel „Lager“ mit Bestand und Ausbau.
 - Alle Zahlen sind Startwerte; Balancing in Stufe 8.
+
+## Stand Stufe 3 (Entscheidungen)
+
+- Auftragsangebote (2–4, mehr bei gutem Ruf), Größe passend zur Lagerkapazität; bis zu 3 laufende Aufträge.
+- Firmenwagen liefert in Touren: 40 Plätze, Verladen 1 Std. + 3 Min./Stk, Fahrt 1–4 Std. je Weg, Abladen 30 Min.; Touren starten nur 6–18 Uhr; Auftrag mit kürzester Frist zuerst.
+- Bezahlung pro Tour; pünktlich +10 % Bonus und Ruf +4; verspätet −5 %/Tag (max. −30 %) und Ruf −3/Tag; Abbruch −30 % vom Restwert und Ruf −8.
+- Meldungen (Postfach 🔔, gespeichert im Spielstand): Auftrag fertig, Touren pausiert (Bestand fehlt), überfällig, eigene Mindestmenge unterschritten, Lieferungen/Verspätungen. Angebote nur als Zähler am Knopf „Aufträge“.
+- Zeit: im Spiel schnell (1× = 12 Spielminuten pro Sekunde). Im Hintergrund (Spiel zu oder Tab verdeckt) **Echtzeit** (1 min = 1 Spielminute), max. 30 Spieltage; bei Pause kein Nachrechnen. Danach Zusammenfassung „Während du weg warst“.
+
+## Später / offene Richtungsentscheidungen
+
+- **Eigenes Hosting auf dem Rechner des Nutzers** (statt Artifact-Link), damit echte Benachrichtigungen (Push/PWA) möglich werden. Vor jeder Einrichtung dort die Systemstand-Regeln des Nutzers beachten.
+- **Option Godot** für eine ausgearbeitetere Grafik: würde Rendering und UI ersetzen; die TypeScript-Simulation ließe sich nicht direkt übernehmen (Godot nutzt GDScript/C#). Entscheidung möglichst früh treffen, da der Portierungsaufwand mit jeder Stufe wächst.
 
 ## Architekturregeln (verbindlich)
 

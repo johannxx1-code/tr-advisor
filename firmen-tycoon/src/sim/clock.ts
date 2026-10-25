@@ -29,3 +29,14 @@ export function dayOf(totalMinutes: number): number {
 export function formatClock(time: GameTime): string {
   return `${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')}`;
 }
+
+/** Im Hintergrund (Spiel zu oder Tab verdeckt) läuft die Zeit in Echtzeit: 1 echte Minute = 1 Spielminute. */
+export const OFFLINE_MINUTES_PER_REAL_MINUTE = 1;
+/** Technische Obergrenze fürs Nachrechnen. */
+export const OFFLINE_MAX_MINUTES = 30 * MINUTES_PER_DAY;
+
+/** Spielminuten, die für eine Abwesenheit von `realMs` Millisekunden nachgerechnet werden. */
+export function offlineMinutes(realMs: number): number {
+  if (!(realMs > 0)) return 0;
+  return Math.min(OFFLINE_MAX_MINUTES, (realMs / 60000) * OFFLINE_MINUTES_PER_REAL_MINUTE);
+}

@@ -8,6 +8,7 @@ import {
   capacity, EXTENSION_NAMES, freeSlots, incomingSlots, maxShelves, nextExtensionCost, SHELF_CAPACITY, shelfCost, usedSlots,
 } from '../sim/storage';
 import { maxOrderQty, orderTotal, supplierOffers } from '../sim/trade';
+import { demandFor } from '../sim/jobs';
 
 export type TradeTab = 'buy' | 'sell' | 'orders';
 
@@ -19,10 +20,11 @@ export interface PanelUiState {
   buyQty: number;
   sellArticle: string | null;
   sellQty: number;
+  ordersTab: 'offers' | 'active' | 'done';
 }
 
 export function createPanelUiState(): PanelUiState {
-  return { tradeTab: 'buy', buyArticle: null, buySupplier: null, buyQty: 10, sellArticle: null, sellQty: 1 };
+  return { tradeTab: 'buy', buyArticle: null, buySupplier: null, buyQty: 10, sellArticle: null, sellQty: 1, ordersTab: 'offers' };
 }
 
 const euroFmt = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
@@ -189,10 +191,23 @@ export function renderStorage(state: Readonly<GameState>): string {
   const free = Math.max(0, cap - used - incoming);
   const pct = (v: number) => (cap > 0 ? Math.min(100, (v / cap) * 100) : 0);
 
-  const stock = ARTICLES.filter((a) => (state.inventory[a.id] ?? 0) > 0).map((a) => {
+  const stock = ARTICLES.filter((a) => state.unlocked.includes(a.id) || (state.inventory[a.id] ?? 0) > 0).map((a) => {
     const qty = state.inventory[a.id] ?? 0;
-    return `<div class="row"><span class="row-main"><b>${a.name}</b><small>${qty} Stk · ${qty * a.slots} Plätze</small></span>
-      <b class="price">${euro(bidPrice(state, a.id) * qty)}</b></div>`;
+    const min = state.minStock[a.id] ?? 0;
+    const need = demandFor(state, a.id);
+    const low = min > 0 && qty < min;
+    return `<div class="row stock-row ${low ? 'low' : ''}">
+      <span class="row-main"><b>${a.name}</b>
+        <small>${qty} Stk · Wert ${euroWhole.format(bidPrice(state, a.id) * qty)}${need ? ` · <span class="need">${need} für Aufträge</span>` : ''}</small></span>
+      <span class="minstock" role="group" aria-label="Warnen unter Mindestmenge">
+        <small>${low ? '<span class="pill warn">knapp</span>' : 'Warnen unter'}</small>
+        <span class="minstock-ctrl">
+          <button data-act="min" data-id="${a.id}" data-d="-5" aria-label="Mindestmenge senken">−</button>
+          <output>${min || 'aus'}</output>
+          <button data-act="min" data-id="${a.id}" data-d="5" aria-label="Mindestmenge erhöhen">+</button>
+        </span>
+      </span>
+    </div>`;
   });
 
   const maxS = maxShelves(state.extension);
@@ -216,8 +231,9 @@ export function renderStorage(state: Readonly<GameState>): string {
       </div>
     </div>
 
-    <h3 class="sub">Bestand</h3>
-    ${stock.length ? `<div class="list">${stock.join('')}</div><p class="hint">Wert zum heutigen Händlerpreis.</p>` : '<p class="empty">Keine Ware auf Lager.</p>'}
+    <h3 class="sub">Bestand & Warnungen</h3>
+    <div class="list">${stock.join('')}</div>
+    <p class="hint">„Warnen unter“: Fällt der Bestand darunter, kommt eine Meldung. Wert zum heutigen Händlerpreis.</p>
 
     <h3 class="sub">Ausbau · ${EXTENSION_NAMES[state.extension]}</h3>
     <div class="list">

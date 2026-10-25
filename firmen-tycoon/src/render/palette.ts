@@ -28,6 +28,7 @@ export const PALETTE = {
   leaves: [0x4f9a3a, 0x3f8a32, 0x6aad45],
   van: 0xf4f1ea,
   vanAccent: 0xe07a2a,
+  supplierAccent: 0x3f7fbf,
   tire: 0x2e3238,
   fence: 0xa48a6a,
   desk: 0xa8743f,

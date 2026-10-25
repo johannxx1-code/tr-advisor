@@ -6,6 +6,7 @@ import { dayOf, MINUTES_PER_DAY } from './clock';
 import { marketPrice } from './market';
 import { addMessage } from './messages';
 import { nextRandom, round2 } from './random';
+import { capacity } from './storage';
 import type { GameState, Job, JobOffer, JobResult } from './state';
 import type { ActionResult } from './trade';
 
@@ -73,8 +74,8 @@ function createOffer(state: GameState): JobOffer | null {
   const rep = state.reputation;
   const articleId = state.unlocked[Math.floor(nextRandom(state) * state.unlocked.length)];
   const article = getArticle(articleId);
-  // Menge: 20 … 200 Lagerplätze, größer bei gutem Ruf
-  const baseSlots = 20 + rep * 1.6;
+  // Menge: wächst mit dem Ruf, aber passend zur Lagergröße (sonst am Anfang kaum schaffbar)
+  const baseSlots = Math.min(20 + rep * 1.6, capacity(state) * 1.25);
   const slots = baseSlots * (0.6 + nextRandom(state) * 0.8);
   const qty = Math.max(5, Math.min(200, Math.round(slots / article.slots / 5) * 5));
   // Preis: 5 … 20 % über Markt, Ruf verschiebt um bis zu ±10 %
@@ -102,20 +103,11 @@ export function refreshOffers(state: GameState): void {
   const day = dayOf(state.minutes);
   state.offers = state.offers.filter((o) => o.expiresDay >= day);
   const target = targetOfferCount(state.reputation);
-  let added = 0;
+  // Angebote erzeugen keine Meldung – die Anzahl steht als Zähler am Knopf „Aufträge“.
   while (state.offers.length < target) {
     const offer = createOffer(state);
     if (!offer) break;
     state.offers.push(offer);
-    added++;
-  }
-  if (added > 0) {
-    addMessage(state, {
-      kind: 'offer',
-      title: added === 1 ? 'Neues Auftragsangebot' : `${added} neue Auftragsangebote`,
-      text: state.offers.slice(-added).map((o) => `${o.qty}× ${getArticle(o.articleId).name} für ${o.customer}`).join(' · '),
-      target: { panel: 'orders' },
-    });
   }
 }
 

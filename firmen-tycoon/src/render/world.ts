@@ -17,11 +17,6 @@ export function buildWorld(): World {
   root.add(buildRoad());
   root.add(buildLot());
 
-  const van = buildVan();
-  van.position.set(8, 0, 9);
-  van.rotation.y = -Math.PI / 2;
-  root.add(van);
-
   root.add(buildFence());
   root.add(buildSign());
   root.add(buildTrees());
@@ -77,11 +72,12 @@ function buildLot(): THREE.Object3D {
   return g;
 }
 
-export function buildVan(): THREE.Group {
+/** Kastenwagen; `accent` färbt den Zierstreifen (Firmenwagen orange, Lieferant blau). */
+export function buildVan(accent: number = PALETTE.vanAccent): THREE.Group {
   const van = new THREE.Group();
   van.add(box(4.6, 1.6, 2, PALETTE.van, 0, 1.25, 0));
   van.add(box(1.2, 1.1, 1.9, PALETTE.van, 2.85, 1.0, 0));
-  van.add(box(4.62, 0.25, 2.02, PALETTE.vanAccent, 0, 1.0, 0));
+  van.add(box(4.62, 0.25, 2.02, accent, 0, 1.0, 0));
   const glass = mat(PALETTE.window);
   van.add(box(0.06, 0.6, 1.7, glass, 3.46, 1.3, 0, false));
   const wheelGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.3, 8);
