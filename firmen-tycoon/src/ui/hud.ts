@@ -60,6 +60,11 @@ export class Hud {
       <div class="menu" data-ref="menu" hidden>
         <button data-action="save">💾 Speichern</button>
         <button data-action="new">🆕 Neues Spiel</button>
+        <div class="menu-confirm" data-ref="confirm" hidden>
+          <p>Aktuellen Spielstand überschreiben?</p>
+          <button data-action="confirm-new" class="danger">Ja, neu starten</button>
+          <button data-action="cancel">Abbrechen</button>
+        </div>
       </div>
       <nav class="bottombar"></nav>
       <section class="panel" data-ref="panel" hidden>
@@ -100,15 +105,24 @@ export class Hud {
     }
 
     ref('panelClose').addEventListener('click', () => this.togglePanel(null));
+    // Rückfrage im Menü selbst: confirm() ist in eingebetteten Ansichten (z. B. Artifact) blockiert.
+    const confirmEl = ref('confirm');
     ref('menuBtn').addEventListener('click', (e) => {
       e.stopPropagation();
+      confirmEl.hidden = true;
       this.menuEl.hidden = !this.menuEl.hidden;
     });
     this.menuEl.addEventListener('click', (e) => {
       const action = (e.target as HTMLElement).closest('button')?.dataset.action;
+      if (!action) return;
+      if (action === 'new') {
+        confirmEl.hidden = false;
+        return;
+      }
       this.menuEl.hidden = true;
+      confirmEl.hidden = true;
       if (action === 'save') actions.save();
-      if (action === 'new' && confirm('Neues Spiel starten? Der aktuelle Spielstand wird überschrieben.')) actions.newGame();
+      if (action === 'confirm-new') actions.newGame();
     });
     document.addEventListener('pointerdown', (e) => {
       if (!this.menuEl.hidden && !(e.target as HTMLElement).closest('.menu, [data-ref="menuBtn"]')) this.menuEl.hidden = true;

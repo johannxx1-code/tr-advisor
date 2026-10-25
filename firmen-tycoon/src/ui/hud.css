@@ -138,6 +138,17 @@ button {
   font-weight: 600;
 }
 .menu button:hover { background: var(--ui-accent-soft); }
+.menu-confirm {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--ui-border);
+}
+.menu-confirm[hidden] { display: none; }
+.menu-confirm p { margin: 6px 12px; font-size: 0.9rem; color: var(--ui-muted); }
+.menu .danger { background: #c2452f; color: #fff; }
+.menu .danger:hover { background: #a93a27; }
 
 /* ---------- Menüleiste unten ---------- */
 .bottombar {
